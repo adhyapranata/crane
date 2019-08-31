@@ -1,1 +1,1 @@
-# react-native-sqlite-query-builder
+# react-native-query-builder
