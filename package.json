@@ -1,0 +1,29 @@
+{
+  "name": "react-native-query-builder",
+  "version": "0.1.0",
+  "main": "index.js",
+  "repository": "git@github.com:adhyapranata/react-native-query-builder.git",
+  "author": "Adhya Pranata <adhyapranata@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "sqlite",
+    "react-native",
+    "query-builder"
+  ],
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint"
+  },
+  "files": [
+    "src/"
+  ],
+  "devDependencies": {
+    "@babel/core": "^7.5.5",
+    "@babel/preset-env": "^7.5.5",
+    "babel-jest": "^24.9.0",
+    "eslint": "^6.3.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-plugin-import": "^2.18.2",
+    "jest": "^24.9.0"
+  }
+}
