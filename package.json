@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "test": "jest",
-    "lint": "eslint"
+    "test:watch": "jest --watch"
   },
   "files": [
     "src/"
@@ -21,9 +21,7 @@
     "@babel/core": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
     "babel-jest": "^24.9.0",
-    "eslint": "^6.3.0",
-    "eslint-config-airbnb-base": "^14.0.0",
-    "eslint-plugin-import": "^2.18.2",
-    "jest": "^24.9.0"
+    "jest": "^24.9.0",
+    "standard": "^14.1.0"
   }
 }
