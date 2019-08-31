@@ -44,7 +44,7 @@ export default class Builder {
     }
     this.aggregate = null
     this.columns = []
-    this.distinct = false
+    this.isDistinct = false
     this.from = null
     this.joins = null
     this.wheres = []
@@ -61,13 +61,15 @@ export default class Builder {
   }
 
   table (name) {
+    if (!Builder._isValidArgument(name, () => Builder._isString(name))) return false
+
     this.from = name
 
     return this
   }
 
   select () {
-    if (Builder._areValidArguments(arguments)) return false
+    if (!Builder._areValidArguments(arguments)) return false
 
     this.columns = [...this.columns, ...arguments]
 
@@ -75,31 +77,39 @@ export default class Builder {
   }
 
   distinct () {
-    this.distinct = true
+    this.isDistinct = true
+
+    return this
   }
 
   where () {
-    if (Builder._areValidArguments(arguments, { min: 2 })) return false
+    if (!Builder._areValidArguments(arguments, { min: 2 })) return false
 
     this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
     this.wheres = [
       ...this.wheres,
-      Builder._formatWhere(arguments)
+      Builder._assembleWhere(arguments)
     ]
 
     return this
   }
 
   orWhere () {
-    if (Builder._areValidArguments(arguments, { min: 2 })) return false
+    if (!Builder._areValidArguments(arguments, { min: 2 })) return false
 
     this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
     this.wheres = [
       ...this.wheres,
-      Builder._formatWhere(arguments, { or: true })
+      Builder._assembleWhere(arguments, { or: true })
     ]
 
     return this
+  }
+
+  static raw (expression) {
+    if (!Builder._isValidArgument(expression, () => Builder._isString(expression))) return false
+
+    return expression
   }
 
   get () {
@@ -119,8 +129,8 @@ export default class Builder {
   }
 
   _executeSql (resolve, reject) {
-    const sql = this._getSql()
-    const params = this._getParams()
+    const sql = this._assembleSql()
+    const params = this._assembleParams()
 
     console.tron.log('sql', sql)
     console.tron.log('params', params)
@@ -149,7 +159,7 @@ export default class Builder {
     })
   }
 
-  _getSql () {
+  _assembleSql () {
     const select = this._stringifySelect()
     const from = this._stringifyFrom()
     const where = this._stringifyWhere()
@@ -157,7 +167,7 @@ export default class Builder {
     return `${select} ${from} ${where}`
   }
 
-  _getParams () {
+  _assembleParams () {
     let params = []
     Object.values(this.bindings).forEach(binding => {
       if (binding.length) {
@@ -169,11 +179,11 @@ export default class Builder {
   }
 
   _stringifySelect () {
-    const prefix = !this.distinct ? 'SELECT' : 'SELECT DISTINCT'
+    const prefix = !this.isDistinct ? 'SELECT' : 'SELECT DISTINCT'
 
     return !this.columns.length
       ? `${prefix} *`
-      : `${prefix} ${this.columns.join(',')}`
+      : `${prefix} ${this.columns.join(', ')}`
   }
 
   _stringifyFrom () {
@@ -194,7 +204,7 @@ export default class Builder {
       }).join('')
   }
 
-  static _formatWhere (args, options = { or: false }) {
+  static _assembleWhere (args, options = { or: false }) {
     const operator = Builder._getOperator(args)
     const value = Builder._getValue(args)
 
@@ -227,12 +237,56 @@ export default class Builder {
     return operators.find(operator => operator === target)
   }
 
-  static _areValidArguments (args, options = { min: 1 }) {
-    return args.length < options.min
+  static _isString (value) {
+    return typeof value === 'string' || value instanceof String
+  }
+
+  static _isNumber (value) {
+    return typeof value === 'number' && isFinite(value)
+  }
+
+  static _isFunction (value) {
+    return typeof value === 'function'
   }
 
   static _isObject (value) {
-    return typeof value === 'object'
+    return value && typeof value === 'object' && value.constructor === Object
+  }
+
+  static _isNull (value) {
+    return value === null
+  }
+
+  static _isUndefined (value) {
+    return typeof value === 'undefined'
+  }
+
+  static _isBoolean (value) {
+    return typeof value === 'boolean'
+  }
+
+  static _isRegExp (value) {
+    return value && typeof value === 'object' && value.constructor === RegExp
+  }
+
+  static _isError (value) {
+    return value instanceof Error && typeof value.message !== 'undefined'
+  }
+
+  static _isDate (value) {
+    return value instanceof Date
+  }
+
+  static _isSymbol (value) {
+    return typeof value === 'symbol'
+  }
+
+  static _isValidArgument (target, callback) {
+    return target && callback()
+  }
+
+  static _areValidArguments (args, options = { min: 1 }) {
+    return args.length >= options.min
   }
 
   static _hasKey (target, key) {
