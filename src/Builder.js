@@ -1,6 +1,5 @@
-// import SQLiteConnection from './SQLiteConnection'
+import SQLiteConnection from './SQLiteConnection'
 
-// const database = SQLiteConnection.database
 const operators = [
   '=',
   '<',
@@ -34,7 +33,7 @@ const operators = [
 ]
 
 export default class Builder {
-  constructor () {
+  constructor() {
     this.bindings = {
       select: [],
       join: [],
@@ -44,7 +43,7 @@ export default class Builder {
       union: []
     }
     this.aggregate = null
-    this.columns = null
+    this.columns = []
     this.distinct = false
     this.from = null
     this.joins = null
@@ -61,74 +60,86 @@ export default class Builder {
     this.lock = null
   }
 
-  table (name) {
+  table(name) {
     this.from = name
+
     return this
   }
 
-  select () {
-    if (Builder._areValidArguments(arguments)) {
-      return false
-    }
+  select() {
+    if (Builder._areValidArguments(arguments)) return false
 
-    this.columns = [...this.columns, arguments]
+    this.columns = [...this.columns, ...arguments]
+
     return this
   }
 
-  where () {
-    if (Builder._areValidArguments(arguments, { min: 2 })) {
-      return false
-    }
+  where() {
+    if (Builder._areValidArguments(arguments, {min: 2})) return false
 
-    const lastArgument = arguments[arguments.length - 1]
+    this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
+    this.wheres = [
+      ...this.wheres,
+      this._formatWhere(arguments)
+    ]
 
-    this.wheres = [...this.wheres, {
+    return this
+  }
+
+  orWhere() {
+    if (Builder._areValidArguments(arguments, {min: 2})) return false
+
+    this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
+    this.wheres = [
+      ...this.wheres,
+      Builder._formatWhere(arguments, {or: true})
+    ]
+
+    return this
+  }
+
+  static _formatWhere(args, options = {or: false}) {
+    const operator = Builder._getOperator(args)
+    const value = Builder._getValue(args)
+
+    return {
       type: 'Basic',
-      column: arguments[0],
-      operator: Builder._hasOperator() && this._isValidOperator(arguments[1])
-        ? arguments[1]
-        : '=',
-      value: Builder._hasOperator()
-        ? arguments[2]
-        : arguments[1],
-      boolean: Builder._hasBoolean(lastArgument)
-        ? lastArgument.boolean
-        : 'and'
-    }]
-
-    return this
+      column: args[0],
+      operator,
+      value,
+      boolean: options.or ? 'or' : 'and'
+    }
   }
 
-  orWhere () {
-    return this.where([...arguments, { boolean: 'or' }])
-  }
-
-  _isValidOperator (target) {
+  static _isValidOperator(target) {
     return operators.find(operator => operator === target)
   }
 
-  static _hasBoolean (lastArgument) {
-    return Builder._isKeyExists(lastArgument, 'boolean')
+  static _getOperator(args) {
+    return Builder._hasOperator(args) && Builder._isValidOperator(args[1])
+      ? args[1]
+      : '='
   }
 
-  static _areValidArguments () {
-    const options = arguments[arguments.length - 1]
-    const min = Builder._isKeyExists(options, 'min')
-      ? options.min
-      : 1
-
-    return arguments.length < min
+  static _getValue(args) {
+    return Builder._hasOperator(args)
+      ? args[2]
+      : args[1]
   }
 
-  static _isKeyExists (target, key) {
+  static _areValidArguments(args, options = {min: 1}) {
+    return args.length < options.min
+  }
+
+  static _hasKey(target, key) {
     return Builder._isObject(target) && Object.prototype.hasOwnProperty.call(target, key)
   }
 
-  static _hasOperator () {
-    return arguments.length > 2
+  static _hasOperator(args) {
+    return args.length > 2
   }
 
-  static _isObject (value) {
+  static _isObject(value) {
     return typeof value === 'object'
   }
 }
