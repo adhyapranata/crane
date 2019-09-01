@@ -104,22 +104,6 @@ export default class Builder {
     return this
   }
 
-  get() {
-    return this.executeSql(
-      res => res[0].rows,
-      errors => {
-        throw errors
-      })
-  }
-
-  first() {
-    return this.executeSql(
-      res => res[0].rows[0],
-      errors => {
-        throw errors
-      })
-  }
-
   distinct() {
     this.isDistinct = true
 
@@ -200,6 +184,22 @@ export default class Builder {
 
   static raw(value) {
     return new Expression(value)
+  }
+
+  get() {
+    return this.executeSql(
+      res => res[0].rows,
+      errors => {
+        throw errors
+      })
+  }
+
+  first() {
+    return this.executeSql(
+      res => res[0].rows[0],
+      errors => {
+        throw errors
+      })
   }
 
   selectSub(query, as) {
