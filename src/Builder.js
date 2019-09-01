@@ -1,35 +1,26 @@
 import SQLiteConnection from './SQLiteConnection'
+import Expression from './Expression'
+import Grammar from './SQLiteGrammar'
+import {
+  isString,
+  isBoolean,
+  isObject,
+  isFunction,
+  isNull
+} from './DataType'
+import {
+  objectKey,
+  objectVal
+} from './Utilities'
 
 const operators = [
-  '=',
-  '<',
-  '>',
-  '<=',
-  '>=',
-  '<>',
-  '!=',
-  '<=>',
-  'like',
-  'like binary',
-  'not like',
-  'ilike',
-  '&',
-  '|',
-  '^',
-  '<<',
-  '>>',
-  'rlike',
-  'regexp',
-  'not regexp',
-  '~',
-  '~*',
-  '!~',
-  '!~*',
-  'similar to',
-  'not similar to',
-  'not ilike',
-  '~~*',
-  '!~~*'
+  '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
+  'like', 'like binary', 'not like', 'ilike',
+  '&', '|', '^', '<<', '>>',
+  'rlike', 'regexp', 'not regexp',
+  '~', '~*', '!~', '!~*', 'similar to',
+  'not similar to', 'not ilike',
+  '~~*', '!~~*'
 ]
 
 export default class Builder {
@@ -58,20 +49,57 @@ export default class Builder {
     this.unionOffset = null
     this.unionOrders = null
     this.lock = null
+    this.grammar = new Grammar()
   }
 
-  table (name) {
-    if (!Builder._isValidArgument(name, () => Builder._isString(name))) return false
-
-    this.from = name
+  table (table, as = null) {
+    this.from = as ? `${table} as ${as}` : table
 
     return this
   }
 
-  select () {
-    if (!Builder._areValidArguments(arguments)) return false
+  select (columns = ['*']) {
+    const checkedColumns = Array.isArray(columns) ? columns : [...arguments]
+    let as = null
 
-    this.columns = [...this.columns, ...arguments]
+    checkedColumns.forEach(column => {
+      as = objectKey(column)
+      if (isString(as) && (
+        column instanceof Builder || isFunction(column))
+      ) {
+        this.selectSub(column, as)
+      } else {
+        this.columns = [...this.columns, column]
+      }
+    })
+
+    return this
+  }
+
+  selectRaw (expression, bindings = []) {
+    this.addSelect((new Expression(expression)).getValue())
+    if (bindings) {
+      this.addBinding(bindings, 'select')
+    }
+
+    return this
+  }
+
+  addSelect (column) {
+    const columns = Array.isArray(column) ? column : arguments
+    let as = null
+
+    columns.forEach(column => {
+      as = objectKey(column)
+      if (isString(as) && (column instanceof Builder || isFunction(column))) {
+        if (isNull(this.columns)) {
+          this.select(`${this.from}.*`)
+        }
+        this.selectSub(column, as)
+      } else {
+        this.columns = [...this.columns, column]
+      }
+    })
 
     return this
   }
@@ -82,38 +110,86 @@ export default class Builder {
     return this
   }
 
-  where () {
-    if (!Builder._areValidArguments(arguments, { min: 2 })) return false
+  where (column, operator = null, value = null, boolean = 'and') {
+    if (Array.isArray(column)) {
+      return this.addArrayOfWheres(column, boolean)
+    }
 
-    this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (isFunction(column)) {
+      return this.whereNested(column, boolean)
+    }
+
+    if (Builder.invalidOperator(checkedOperator)) {
+      checkedValue = checkedOperator
+      checkedOperator = '='
+    }
+
+    if (isFunction(checkedValue)) {
+      return this.whereSub(column, checkedOperator, checkedValue, boolean)
+    }
+
+    if (isNull(checkedValue)) {
+      return this.whereNull(column, boolean, checkedOperator !== '=')
+    }
+
+    let type = 'Basic'
+
+    if (column.includes('->') && isBoolean(value)) {
+      checkedValue = (new Expression(value ? 'true' : 'false')).getValue()
+      if (isString(column)) {
+        type = 'JsonBoolean'
+      }
+    }
+
     this.wheres = [
       ...this.wheres,
-      Builder._assembleWhere(arguments)
+      {
+        type, column, operator: checkedOperator, value: checkedValue, boolean
+      }
     ]
+
+    if (!(checkedValue instanceof Expression)) {
+      this.addBinding(checkedValue, 'where')
+    }
 
     return this
   }
 
-  orWhere () {
-    if (!Builder._areValidArguments(arguments, { min: 2 })) return false
+  orWhere (column, operator = null, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
 
-    this.bindings.where = [...this.bindings.where, Builder._getValue(arguments)]
-    this.wheres = [
-      ...this.wheres,
-      Builder._assembleWhere(arguments, { or: true })
-    ]
+    return this.where(column, checkedOperator, checkedValue, 'or')
+  }
+
+  whereNull (columns, boolean = 'and', not = false) {
+    const type = not ? 'NotNull' : 'Null'
+    Builder.wrap(columns).forEach(column => {
+      this.wheres = [...this.wheres, { type, column, boolean }]
+    })
 
     return this
   }
 
-  static raw (expression) {
-    if (!Builder._isValidArgument(expression, () => Builder._isString(expression))) return false
+  whereNotNull (column, boolean = 'and') {
+    return this.whereNull(column, boolean, true)
+  }
 
-    return expression
+  orWhereNull (column) {
+    return this.whereNull(column, 'or')
+  }
+
+  static raw (value) {
+    return (new Expression(value)).getValue()
   }
 
   get () {
-    return this._executeSql(
+    return this.executeSql(
       res => res[0].rows,
       errors => {
         throw errors
@@ -121,26 +197,154 @@ export default class Builder {
   }
 
   first () {
-    return this._executeSql(
+    return this.executeSql(
       res => res[0].rows[0],
       errors => {
         throw errors
       })
   }
 
-  _executeSql (resolve, reject) {
-    const sql = this._assembleSql()
-    const params = this._assembleParams()
+  selectSub (query, as) {
+    const { checkedQuery, bindings } = Builder.createSub(query)
+    return this.selectRaw(
+      `(${checkedQuery}) as ${this.grammar.wrap(as)}`, bindings
+    )
+  }
 
+  whereSub (column, operator, callback, boolean) {
+    const type = 'Sub'
+    const query = Builder.forSubQuery()
+
+    callback(query)
+    this.wheres = [...this.wheres, { type, column, operator, query, boolean }]
+    this.addBinding(query.getBindings(), 'where')
+
+    return this
+  }
+
+  static createSub (query) {
+    if (isFunction(query)) {
+      const callback = query
+      callback(query = Builder.forSubQuery())
+    }
+
+    return Builder.parseSub(query)
+  }
+
+  static parseSub (query) {
+    if (query instanceof Builder) {
+      return [query.toSql(), query.getBindings()]
+    } else if (isString(query)) {
+      return [query, []]
+    } else {
+      throw new Error('Invalid argument')
+    }
+  }
+
+  addBinding (value, type = 'where') {
+    if (!Builder.hasKey(this.bindings, type)) {
+      throw new Error('Invalid binding type: {type}.')
+    }
+
+    if (Array.isArray(value)) {
+      this.bindings[type] = [...this.bindings[type], ...value]
+    } else {
+      this.bindings[type] = [...this.bindings[type], value]
+    }
+
+    return this
+  }
+
+  getBindings () {
+    return this.bindings.flat()
+  }
+
+  static prepareValueAndOperator (value, operator, useDefault = false) {
+    if (useDefault) {
+      return { checkedValue: operator, checkedOperator: '=' }
+    } else if (Builder.invalidOperatorAndValue(operator, value)) {
+      throw new Error('Illegal operator and value combination.')
+    }
+    return { checkedValue: value, checkedOperator: operator }
+  }
+
+  static invalidOperatorAndValue (operator, value) {
+    return isNull(value) &&
+      operators.find(op => op === operator) &&
+      !['=', '<>', '!='].find(op => op === operator)
+  }
+
+  static invalidOperator (target) {
+    return !operators.find(operator => operator === target)
+  }
+
+  addArrayOfWheres (column, boolean, method = 'where') {
+    return this.whereNested(query => {
+      column.forEach(value => {
+        if (Array.isArray(value)) {
+          query[method](...value)
+        } else {
+          query[method](objectKey(value), '=', objectVal(value))
+        }
+      })
+
+      return query
+    }, boolean)
+  }
+
+  whereNested (callback, boolean = 'and') {
+    const query = callback(this.forNestedWhere())
+    return this.addNestedWhereQuery(query, boolean)
+  }
+
+  forNestedWhere () {
+    return Builder.newQuery().table(this.from)
+  }
+
+  addNestedWhereQuery (query, boolean = 'and') {
+    if (query.wheres.length) {
+      const type = 'Nested'
+      this.wheres = [...this.wheres, { type, query, boolean }]
+      this.addBinding(query.getRawBindings().where, 'where')
+    }
+
+    return this
+  }
+
+  getRawBindings () {
+    return this.bindings
+  }
+
+  static forSubQuery () {
+    return Builder.newQuery()
+  }
+
+  static newQuery () {
+    return new Builder()
+  }
+
+  static wrap (value) {
+    return !Array.isArray(value) ? [value] : value
+  }
+
+  static hasKey (target, key) {
+    return isObject(target) && Object.prototype.hasOwnProperty.call(target, key)
+  }
+
+  executeSql (resolve, reject) {
+    const sql = this.assembleSql()
+    const params = this.assembleParams()
+
+    console.tron.log('this', this)
     console.tron.log('sql', sql)
     console.tron.log('params', params)
 
-    return this._executeBulkSql([sql], [params])
+    return this.executeBulkSql([sql], [params])
       .then(res => resolve(res))
       .catch(errors => reject(errors))
   }
 
-  _executeBulkSql (sqls, params = []) {
+  executeBulkSql (sqls, params = []) {
     return new Promise((txResolve, txReject) => {
       SQLiteConnection.database.transaction(tx => {
         Promise.all(sqls.map((sql, index) => {
@@ -159,15 +363,21 @@ export default class Builder {
     })
   }
 
-  _assembleSql () {
-    const select = this._stringifySelect()
-    const from = this._stringifyFrom()
-    const where = this._stringifyWhere()
+  toSql () {
+    // TODO
+    // return this.grammar.compileSelect(this)
+    return this.compileSelect(this)
+  }
+
+  assembleSql () {
+    const select = this.compileSelect()
+    const from = this.compileFrom()
+    const where = this.compileWhere()
 
     return `${select} ${from} ${where}`
   }
 
-  _assembleParams () {
+  assembleParams () {
     let params = []
     Object.values(this.bindings).forEach(binding => {
       if (binding.length) {
@@ -178,118 +388,35 @@ export default class Builder {
     return params
   }
 
-  _stringifySelect () {
-    const prefix = !this.isDistinct ? 'SELECT' : 'SELECT DISTINCT'
+  compileSelect () {
+    const prefix = !this.isDistinct ? 'select' : 'select distinct'
 
     return !this.columns.length
       ? `${prefix} *`
       : `${prefix} ${this.columns.join(', ')}`
   }
 
-  _stringifyFrom () {
-    const prefix = 'FROM'
+  compileFrom () {
+    const prefix = 'from'
 
     return `${prefix} ${this.from}`
   }
 
-  _stringifyWhere () {
-    let prefix = 'WHERE'
+  compileWhere () {
+    let prefix = 'where'
 
     return !this.wheres.length
       ? ''
       : this.wheres.map((where, index) => {
-        prefix = index ? ` ${where.boolean.toUpperCase()}` : prefix
+        prefix = index ? ` ${where.boolean}` : prefix
 
-        return `${prefix} ${where.column} ${where.operator} ?`
+        switch (where.type) {
+          case 'NotNull': return `${prefix} ${where.column} is not null`
+          case 'Null': return `${prefix} ${where.column} is null`
+          case 'Nested': return where.query.compileWhere()
+
+          default: return `${prefix} ${where.column} ${where.operator} ?`
+        }
       }).join('')
-  }
-
-  static _assembleWhere (args, options = { or: false }) {
-    const operator = Builder._getOperator(args)
-    const value = Builder._getValue(args)
-
-    return {
-      type: 'Basic',
-      column: args[0],
-      operator,
-      value,
-      boolean: options.or ? 'or' : 'and'
-    }
-  }
-
-  static _getOperator (args) {
-    return Builder._hasOperator(args) && Builder._isValidOperator(args[1])
-      ? args[1]
-      : '='
-  }
-
-  static _getValue (args) {
-    return Builder._hasOperator(args)
-      ? args[2]
-      : args[1]
-  }
-
-  static _hasOperator (args) {
-    return args.length > 2
-  }
-
-  static _isValidOperator (target) {
-    return operators.find(operator => operator === target)
-  }
-
-  static _isString (value) {
-    return typeof value === 'string' || value instanceof String
-  }
-
-  static _isNumber (value) {
-    return typeof value === 'number' && isFinite(value)
-  }
-
-  static _isFunction (value) {
-    return typeof value === 'function'
-  }
-
-  static _isObject (value) {
-    return value && typeof value === 'object' && value.constructor === Object
-  }
-
-  static _isNull (value) {
-    return value === null
-  }
-
-  static _isUndefined (value) {
-    return typeof value === 'undefined'
-  }
-
-  static _isBoolean (value) {
-    return typeof value === 'boolean'
-  }
-
-  static _isRegExp (value) {
-    return value && typeof value === 'object' && value.constructor === RegExp
-  }
-
-  static _isError (value) {
-    return value instanceof Error && typeof value.message !== 'undefined'
-  }
-
-  static _isDate (value) {
-    return value instanceof Date
-  }
-
-  static _isSymbol (value) {
-    return typeof value === 'symbol'
-  }
-
-  static _isValidArgument (target, callback) {
-    return target && callback()
-  }
-
-  static _areValidArguments (args, options = { min: 1 }) {
-    return args.length >= options.min
-  }
-
-  static _hasKey (target, key) {
-    return Builder._isObject(target) && Object.prototype.hasOwnProperty.call(target, key)
   }
 }
