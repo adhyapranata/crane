@@ -7,7 +7,7 @@ export function last (value) {
 
 export function except (obj, exceptions = []) {
   exceptions.forEach(exception => {
-    if (obj.hasOwnProperty(exception)) {
+    if (Object.prototype.hasOwnProperty.call(obj, exception)) {
       delete obj[exception]
     }
   })
@@ -18,7 +18,7 @@ export function except (obj, exceptions = []) {
 export function only (obj, inclusions = []) {
   const result = {}
   inclusions.forEach(inclusion => {
-    if (obj.hasOwnProperty(inclusion)) {
+    if (Object.prototype.hasOwnProperty.call(obj, inclusion)) {
       result[inclusion] = obj[inclusion]
     }
   })
@@ -26,8 +26,7 @@ export function only (obj, inclusions = []) {
   return result
 }
 
-export function replaceFirst(search, replace, subject)
-{
+export function replaceFirst (search, replace, subject) {
   if (search === '') {
     return subject
   }
@@ -35,13 +34,13 @@ export function replaceFirst(search, replace, subject)
   if (position !== false) {
     return subject.replace(search, replace)
   }
-  return subject;
+  return subject
 }
 
-export function objectKey(obj) {
+export function objectKey (obj) {
   return Object.keys(obj)[0]
 }
 
-export function objectVal(obj) {
+export function objectVal (obj) {
   return Object.values(obj)[0]
 }
