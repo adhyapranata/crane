@@ -1,3 +1,5 @@
+import Expression from './Expression'
+
 export default class Grammar {
   constructor () {
     this.tablePrefix = ''
@@ -579,11 +581,11 @@ export default class Grammar {
   //   return 'ROLLBACK TO SAVEPOINT '.name
   // }
   //
-  static parameter(value) {
-    return Grammar.isExpression(value) ? Grammar.getValue(value) : '?';
+  static parameter (value) {
+    return Grammar.isExpression(value) ? Grammar.getValue(value) : '?'
   }
 
-  wrap(value, prefixAlias = false) {
+  wrap (value, prefixAlias = false) {
     if (Grammar.isExpression(value)) {
       return Grammar.getValue(value)
     }
@@ -599,8 +601,7 @@ export default class Grammar {
     return this.wrapSegments(value.split('->'))
   }
 
-  wrapSegments(segments)
-  {
+  wrapSegments (segments) {
     return segments.map((segment, key) => {
       return key === 0 && segments.length > 1
         ? this.wrapTable(segment)
@@ -608,44 +609,41 @@ export default class Grammar {
     }).join('.')
   }
 
-  wrapAliasedValue(value, prefixAlias = false) {
+  wrapAliasedValue (value, prefixAlias = false) {
     const segments = value.split(/\s+as\s+/i)
 
     if (prefixAlias) {
-      segments[1] = `${this.tablePrefix}${segments[1]}`;
+      segments[1] = `${this.tablePrefix}${segments[1]}`
     }
     return `${this.wrap(segments[0])} as ${Grammar.wrapValue(segments[1])}`
   }
 
-  static wrapValue(value) {
+  static wrapValue (value) {
     if (value !== '*') {
-      return `"${value.replace('"', '""')}"`;
+      return `"${value.replace('"', '""')}"`
     }
-    return value;
+    return value
   }
 
-
-  wrapTable(table)
-  {
+  wrapTable (table) {
     if (!Grammar.isExpression(table)) {
       return this.wrap(this.tablePrefix.table, true)
     }
     return Grammar.getValue(table)
   }
 
-  static isExpression(value)
-  {
+  static isExpression (value) {
     return value instanceof Expression
   }
 
-  static getValue(expression)
-  {
+  static getValue (expression) {
     return expression.getValue()
   }
 
-  wrapJsonSelector(value) {
+  wrapJsonSelector (value) {
     throw new Error('This database engine does not support JSON operations.')
   }
+
   //
   // wrapJsonBooleanSelector(value) {
   //   return this.wrapJsonSelector(value)
@@ -672,7 +670,7 @@ export default class Grammar {
   //   '"\''
   // }
   //
-  static isJsonSelector(value) {
+  static isJsonSelector (value) {
     return value.contains('->')
   }
 
