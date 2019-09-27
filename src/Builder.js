@@ -381,6 +381,161 @@ export default class Builder {
     return this.whereColumn(first, operator, second, 'or')
   }
 
+  groupBy (...groups) {
+    groups.forEach(group => {
+      this.groups = [...this.groups, group]
+    })
+
+    return this
+  }
+
+  having (column, operator = null, value = null, boolean = 'and') {
+    const type = 'Basic'
+
+    // Here we will make some assumptions about the operator. If only 2 values are
+    // passed to the method, we will assume that the operator is an equals sign
+    // and keep going. Otherwise, we'll require the operator to be passed in.
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (Builder.invalidOperator(operator)) {
+      checkedValue = checkedOperator
+      checkedOperator = '='
+    }
+
+    this.havings = [...this.havings, { type, column, operator: checkedOperator, value: checkedValue, boolean }]
+
+    if (!(checkedValue instanceof Expression)) {
+      this.addBinding(checkedValue, 'having')
+    }
+
+    return this
+  }
+
+  orHaving (column, operator = null, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.having(column, checkedOperator, checkedValue, 'or')
+  }
+
+  havingBetween (column, values, boolean = 'and', not = false) {
+    const type = 'between'
+
+    this.havings = [...this.havings, { type, column, values, boolean, not }]
+
+    this.addBinding(this.cleanBindings(values), 'having')
+
+    return this
+  }
+
+  havingRaw (sql, bindings = [], boolean = 'and') {
+    const type = 'Raw'
+
+    this.havings = [...this.havings, { type, sql, boolean }]
+
+    this.addBinding(bindings, 'having')
+
+    return this
+  }
+
+  orHavingRaw (sql, bindings = []) {
+    return this.havingRaw(sql, bindings, 'or')
+  }
+
+  orderBy (column, direction = 'asc') {
+    const orderType = this.unions ? 'unionOrders' : 'orders'
+
+    if (column instanceof Builder ||
+      isFunction(column)) {
+      const { query, bindings } = Builder.createSub(column)
+
+      column = new Expression(`(${query})`)
+
+      this.addBinding(bindings, orderType)
+    }
+
+    direction = direction.toLowerCase()
+
+    if (!(['asc', 'desc']).find(d => d === direction)) {
+      throw new Error('Order direction must be "asc" or "desc".')
+    }
+
+    this[orderType] = [...this[orderType], { column, direction }]
+
+    return this
+  }
+
+  orderByDesc (column) {
+    return this.orderBy(column, 'desc')
+  }
+
+  latest (column = 'created_at') {
+    return this.orderBy(column, 'desc')
+  }
+
+  oldest (column = 'created_at') {
+    return this.orderBy(column, 'asc')
+  }
+
+  inRandomOrder (seed = '') {
+    return this.orderByRaw(this.grammar.compileRandom(seed))
+  }
+
+  orderByRaw (sql, bindings = []) {
+    const type = 'Raw'
+    const orderType = this.unions ? 'unionOrders' : 'orders'
+
+    this[orderType] = [...this[orderType], { type, sql }]
+
+    this.addBinding(bindings, orderType)
+
+    return this
+  }
+
+  skip (value) {
+    const property = this.unions ? 'unionOffset' : 'offset'
+
+    this[property] = Math.max(0, value)
+
+    return this
+  }
+
+  take (value) {
+    const property = this.unions ? 'unionLimit' : 'limit'
+
+    if (value >= 0) {
+      this[property] = value
+    }
+
+    return this
+  }
+
+  forPage (page, perPage = 15) {
+    return this.skip((page - 1) * perPage).take(perPage)
+  }
+
+  union (query, all = false) {
+    if (isFunction(query)) {
+      query(Builder.newQuery())
+    }
+
+    this.unions = [...this.unions, { query, all }]
+
+    this.addBinding(query.getBindings(), 'union')
+
+    return this
+  }
+
+  unionAll (query) {
+    return this.union(query, true)
+  }
+
   static raw (value) {
     return (new Expression(value)).getValue()
   }
@@ -568,6 +723,67 @@ export default class Builder {
     return '?'
   }
 
+  compileGroupBy () {
+    if (!this.groups.length) return ''
+    const prefix = 'group by'
+
+    return `${prefix} ${this.groups.join(', ')}`
+  }
+
+  compileOrderBy () {
+    if (!this.orders.length) return ''
+    const prefix = 'order by'
+
+    return `${prefix} ${this.orders.map(order => `${order.column} ${order.direction}`).join(', ')}`
+  }
+
+  compileHaving () {
+    // If the having clause is "raw", we can just return the clause straight away
+    // without doing any more processing on it. Otherwise, we will compile the
+    // clause into SQL based on the components that make it up from builder.
+    return !this.havings.length
+      ? ''
+      : this.havings.map(having => {
+        if (having['type'] === 'Raw') {
+          return `${having['boolean']} ${having['sql']}`
+        } else if(having['type'] === 'between') {
+          return this.compileHavingBetween(having)
+        }
+
+        return this.compileBasicHaving(having)
+      }).join(' ')
+  }
+
+  compileBasicHaving (having) {
+    const column = this.grammar.wrap(having['column'])
+
+    const parameter = Grammar.parameter(having['value'])
+
+    return `${having['boolean']} ${column} ${having['operator']} ${parameter}`
+  }
+
+  compileHavingBetween (having) {
+    const between = having['not'] ? 'not between' : 'between'
+
+    const column = this.grammar.wrap(having['column'])
+
+    const min = Grammar.parameter(having['values'][0])
+
+    const max = Grammar.parameter(having['values'][having['values'].length - 1])
+
+    return `${having['boolean']} ${column} ${between} ${min} and ${max}`
+  }
+
+  compileOffset () {
+    if (this.offset) return ''
+    return `offset ${isString(this.offset) ? parseInt(this.offset) : this.offset}`
+  }
+
+  compileLimit () {
+    if (this.limit) return ''
+    return `limit ${isString(this.limit) ? parseInt(this.limit) : this.limit}`
+  }
+
   toSql () {
     // TODO
     // return this.grammar.compileSelect(this)
@@ -578,8 +794,13 @@ export default class Builder {
     const select = this.compileSelect()
     const from = this.compileFrom()
     const where = this.compileWhere()
+    const groupBy = this.compileGroupBy()
+    const orderBy = this.compileOrderBy()
+    const having = this.compileHaving()
+    const offset = this.compileOffset()
+    const limit = this.compileLimit()
 
-    return `${select} ${from} ${where}`
+    return `${select} ${from} ${where} ${groupBy} ${orderBy} ${having} ${offset} ${limit}`
   }
 
   assembleParams () {

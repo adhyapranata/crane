@@ -43,7 +43,7 @@ export default class SQLiteGrammar extends Grammar {
 
   compileJsonLength (column, operator, value) {
     const { field, path } = this.wrapJsonFieldAndPath(column)
-    return `json_array_length(${field.path}) ${operator} ${value}`
+    return `json_array_length(${field}${path}) ${operator} ${value}`
   }
 
   compileUpdate (query, values) {

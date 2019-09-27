@@ -392,9 +392,10 @@ export default class Grammar {
   //   }, orders)
   // }
   //
-  // compileRandom(seed) {
-  //   return 'RANDOM()'
-  // }
+  compileRandom (seed) {
+    return 'RANDOM()'
+  }
+
   //
   // compileLimit(query, limit) {
   //   return 'limit '.(int)
