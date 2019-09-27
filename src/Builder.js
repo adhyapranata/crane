@@ -214,7 +214,7 @@ export default class Builder {
   whereIn (column, values, boolean = 'and', not = false) {
     const type = not ? 'NotIn' : 'In'
 
-    this.wheres = [...this.wheres, {type, column, values, boolean}]
+    this.wheres = [...this.wheres, { type, column, values, boolean }]
 
     this.addBinding(this.cleanBindings(values), 'where')
 
@@ -231,6 +231,154 @@ export default class Builder {
 
   orWhereNotIn (column, values) {
     return this.whereNotIn(column, values, 'or')
+  }
+
+  whereDate (column, operator, value = null, boolean = 'and') {
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (checkedValue instanceof Date) {
+      checkedValue = `${checkedValue.getFullYear()}-${checkedValue.getMonth()}-${checkedValue.getDay()}`
+    }
+
+    return this.addDateBasedWhere('Date', column, checkedOperator, checkedValue, boolean)
+  }
+
+  orWhereDate (column, operator, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.whereDate(column, checkedOperator, checkedValue, 'or')
+  }
+
+  whereTime (column, operator, value = null, boolean = 'and') {
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (checkedValue instanceof Date) {
+      checkedValue = `${checkedValue.getHours()}:${checkedValue.getMinutes()}`
+    }
+
+    return this.addDateBasedWhere('Time', column, checkedOperator, checkedValue, boolean)
+  }
+
+  orWhereTime (column, operator, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.whereTime(column, checkedOperator, checkedValue, 'or')
+  }
+
+  whereDay (column, operator, value = null, boolean = 'and') {
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (checkedValue instanceof Date) {
+      checkedValue = checkedValue.getDay()
+    }
+
+    if (!(checkedValue instanceof Expression)) {
+      checkedValue = checkedValue.padStart(2, '0')
+    }
+
+    return this.addDateBasedWhere('Day', column, checkedOperator, checkedValue, boolean)
+  }
+
+  orWhereDay (column, operator, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.whereDay(column, checkedOperator, checkedValue, 'or')
+  }
+
+  whereMonth (column, operator, value = null, boolean = 'and') {
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (checkedValue instanceof Date) {
+      checkedValue = checkedValue.getMonth()
+    }
+
+    if (!(checkedValue instanceof Expression)) {
+      checkedValue = checkedValue.padStart(2, '0')
+    }
+
+    return this.addDateBasedWhere('Month', column, checkedOperator, value, boolean)
+  }
+
+  orWhereMonth (column, operator, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.whereMonth(column, checkedOperator, checkedValue, 'or')
+  }
+
+  whereYear (column, operator, value = null, boolean = 'and') {
+    let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    if (checkedValue instanceof Date) {
+      checkedValue = checkedValue.getFullYear()
+    }
+
+    return this.addDateBasedWhere('Year', column, checkedOperator, checkedValue, boolean)
+  }
+
+  orWhereYear (column, operator, value = null) {
+    const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
+      value, operator, arguments.length === 2
+    )
+
+    return this.whereYear(column, checkedOperator, checkedValue, 'or')
+  }
+
+  addDateBasedWhere (type, column, operator, value, boolean = 'and') {
+    this.wheres = [...this.wheres, { column, type, boolean, operator, value }]
+
+    if (!(value instanceof Expression)) {
+      this.addBinding(value, 'where')
+    }
+
+    return this
+  }
+
+  whereColumn (first, operator = null, second = null, boolean = 'and') {
+    // If the column is an array, we will assume it is an array of key-value pairs
+    // and can add them each as a where clause. We will maintain the boolean we
+    // received when the method was called and pass it into the nested where.
+    if (Array.isArray(first)) {
+      return this.addArrayOfWheres(first, boolean, 'whereColumn')
+    }
+
+    // If the given operator is not found in the list of valid operators we will
+    // assume that the developer is just short-cutting the '=' operators and
+    // we will set the operators to '=' and set the values appropriately.
+    if (Builder.invalidOperator(operator)) {
+      second = operator
+      operator = '='
+    }
+
+    // Finally, we will add this where clause into this array of clauses that we
+    // are building for the query. All of them will be compiled via a grammar
+    // once the query is about to be executed and run against the database.
+    const type = 'Column'
+
+    this.wheres = [...this.wheres, { type, first, operator, second, boolean }]
+
+    return this
+  }
+
+  orWhereColumn (first, operator = null, second = null) {
+    return this.whereColumn(first, operator, second, 'or')
   }
 
   static raw (value) {
@@ -400,6 +548,12 @@ export default class Builder {
           case 'Between': return `${prefix} ${where.column} between ${placeholder} and ${placeholder}`
           case 'NotIn': return `${prefix} ${where.column} not in (${placeholder})`
           case 'In': return `${prefix} ${where.column} in (${placeholder})`
+          case 'Date': return this.grammar.whereDate(this, where)
+          case 'Day': return this.grammar.whereDay(this, where)
+          case 'Month': return this.grammar.whereMonth(this, where)
+          case 'Year': return this.grammar.whereYear(this, where)
+          case 'Time': return this.grammar.whereTime(this, where)
+          case 'Column': return `${prefix} ${where.first} ${where.operator} ${where.second}`
 
           default: return `${prefix} ${where.column} ${where.operator} ?`
         }

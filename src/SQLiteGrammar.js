@@ -38,7 +38,7 @@ export default class SQLiteGrammar extends Grammar {
 
   dateBasedWhere (type, query, where) {
     const value = SQLiteGrammar.parameter(where.value)
-    return `${strftime(`'${type}'`, this.wrap(where.column))} ${where.operator} ${cast(`${value} as text`)}`
+    return `strftime('${type}', ${this.wrap(where.column)}) ${where.operator} cast(${value} as text)`
   }
 
   compileJsonLength (column, operator, value) {
