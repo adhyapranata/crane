@@ -59,10 +59,6 @@ export default class Builder {
     return this
   }
 
-  from (table, as) {
-    this.table(table, as)
-  }
-
   select (columns = ['*']) {
     const checkedColumns = Array.isArray(columns) ? columns : [...arguments]
     let as = null
@@ -218,7 +214,7 @@ export default class Builder {
   whereIn (column, values, boolean = 'and', not = false) {
     const type = not ? 'NotIn' : 'In'
 
-    this.wheres = [...this.wheres, [type, column, values, boolean]]
+    this.wheres = [...this.wheres, {type, column, values, boolean}]
 
     this.addBinding(this.cleanBindings(values), 'where')
 
@@ -388,24 +384,34 @@ export default class Builder {
 
   compileWhere () {
     let prefix = 'where'
+    let placeholder = null
 
     return !this.wheres.length
       ? ''
       : this.wheres.map((where, index) => {
         prefix = index ? ` ${where.boolean}` : prefix
+        placeholder = this.getPlaceholder(where.type, where.values)
 
         switch (where.type) {
           case 'NotNull': return `${prefix} ${where.column} is not null`
           case 'Null': return `${prefix} ${where.column} is null`
           case 'Nested': return where.query.compileWhere()
-          case 'NotBetween': return `${prefix} ${where.column} not between ${this.where.values[0]} and ${this.where.values[1]}`
-          case 'Between': return `${prefix} ${where.column} between ${this.where.values[0]} and ${this.where.values[1]}`
-          case 'NotIn': return `${prefix} ${where.column} not in (${this.where.values.join(', ')})`
-          case 'In': return `${prefix} ${where.column} in (${this.where.values.join(', ')})`
+          case 'NotBetween': return `${prefix} ${where.column} not between ${placeholder} and ${placeholder}`
+          case 'Between': return `${prefix} ${where.column} between ${placeholder} and ${placeholder}`
+          case 'NotIn': return `${prefix} ${where.column} not in (${placeholder})`
+          case 'In': return `${prefix} ${where.column} in (${placeholder})`
 
           default: return `${prefix} ${where.column} ${where.operator} ?`
         }
       }).join('')
+  }
+
+  getPlaceholder (type, values) {
+    if (type === 'NotIn' || type === 'In') {
+      return values.map(() => '?').join(', ')
+    }
+
+    return '?'
   }
 
   toSql () {
