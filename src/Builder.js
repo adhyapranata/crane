@@ -50,12 +50,17 @@ export default class Builder {
     this.unionOrders = null
     this.lock = null
     this.grammar = new Grammar()
+    this.connection = new SQLiteConnection()
   }
 
   table (table, as = null) {
     this.from = as ? `${table} as ${as}` : table
 
     return this
+  }
+
+  from (table, as) {
+    this.table(table, as)
   }
 
   select (columns = ['*']) {
@@ -167,6 +172,28 @@ export default class Builder {
     return this.where(column, checkedOperator, checkedValue, 'or')
   }
 
+  whereBetween (column, values, boolean = 'and', not = false) {
+    const type = not ? 'NotBetween' : 'Between'
+
+    this.wheres = [...this.wheres, { type, column, values, boolean, not }]
+
+    this.addBinding(this.cleanBindings(values), 'where')
+
+    return this
+  }
+
+  orWhereBetween (column, values) {
+    return this.whereBetween(column, values, 'or')
+  }
+
+  whereNotBetween (column, values, boolean = 'and') {
+    return this.whereBetween(column, values, boolean, true)
+  }
+
+  orWhereNotBetween (column, values) {
+    return this.whereNotBetween(column, values, 'or')
+  }
+
   whereNull (columns, boolean = 'and', not = false) {
     const type = not ? 'NotNull' : 'Null'
     Builder.wrap(columns).forEach(column => {
@@ -176,32 +203,46 @@ export default class Builder {
     return this
   }
 
+  orWhereNull (column) {
+    return this.whereNull(column, 'or')
+  }
+
   whereNotNull (column, boolean = 'and') {
     return this.whereNull(column, boolean, true)
   }
 
-  orWhereNull (column) {
-    return this.whereNull(column, 'or')
+  orWhereNotNull (column) {
+    return this.whereNotNull(column, 'or')
+  }
+
+  whereIn (column, values, boolean = 'and', not = false) {
+    const type = not ? 'NotIn' : 'In'
+
+    this.wheres = [...this.wheres, [type, column, values, boolean]]
+
+    this.addBinding(this.cleanBindings(values), 'where')
+
+    return this
+  }
+
+  orWhereIn (column, values) {
+    return this.whereIn(column, values, 'or')
+  }
+
+  whereNotIn (column, values, boolean = 'and') {
+    return this.whereIn(column, values, boolean, true)
+  }
+
+  orWhereNotIn (column, values) {
+    return this.whereNotIn(column, values, 'or')
   }
 
   static raw (value) {
     return (new Expression(value)).getValue()
   }
 
-  get () {
-    return this.executeSql(
-      res => res[0].rows,
-      errors => {
-        throw errors
-      })
-  }
-
-  first () {
-    return this.executeSql(
-      res => res[0].rows[0],
-      errors => {
-        throw errors
-      })
+  cleanBindings (bindings) {
+    return bindings.filter(binding => !(binding instanceof Expression))
   }
 
   selectSub (query, as) {
@@ -331,36 +372,40 @@ export default class Builder {
     return isObject(target) && Object.prototype.hasOwnProperty.call(target, key)
   }
 
-  executeSql (resolve, reject) {
-    const sql = this.assembleSql()
-    const params = this.assembleParams()
+  compileSelect () {
+    const prefix = !this.isDistinct ? 'select' : 'select distinct'
 
-    console.tron.log('this', this)
-    console.tron.log('sql', sql)
-    console.tron.log('params', params)
-
-    return this.executeBulkSql([sql], [params])
-      .then(res => resolve(res))
-      .catch(errors => reject(errors))
+    return !this.columns.length
+      ? `${prefix} *`
+      : `${prefix} ${this.columns.join(', ')}`
   }
 
-  executeBulkSql (sqls, params = []) {
-    return new Promise((txResolve, txReject) => {
-      SQLiteConnection.database.transaction(tx => {
-        Promise.all(sqls.map((sql, index) => {
-          return new Promise((sqlResolve, sqlReject) => {
-            tx.executeSql(
-              sql,
-              params[index],
-              (_, { rows, insertId }) => {
-                sqlResolve({ rows: rows.raw(), insertId })
-              },
-              sqlReject
-            )
-          })
-        })).then(txResolve).catch(txReject)
-      })
-    })
+  compileFrom () {
+    const prefix = 'from'
+
+    return `${prefix} ${this.from}`
+  }
+
+  compileWhere () {
+    let prefix = 'where'
+
+    return !this.wheres.length
+      ? ''
+      : this.wheres.map((where, index) => {
+        prefix = index ? ` ${where.boolean}` : prefix
+
+        switch (where.type) {
+          case 'NotNull': return `${prefix} ${where.column} is not null`
+          case 'Null': return `${prefix} ${where.column} is null`
+          case 'Nested': return where.query.compileWhere()
+          case 'NotBetween': return `${prefix} ${where.column} not between ${this.where.values[0]} and ${this.where.values[1]}`
+          case 'Between': return `${prefix} ${where.column} between ${this.where.values[0]} and ${this.where.values[1]}`
+          case 'NotIn': return `${prefix} ${where.column} not in (${this.where.values.join(', ')})`
+          case 'In': return `${prefix} ${where.column} in (${this.where.values.join(', ')})`
+
+          default: return `${prefix} ${where.column} ${where.operator} ?`
+        }
+      }).join('')
   }
 
   toSql () {
@@ -388,35 +433,18 @@ export default class Builder {
     return params
   }
 
-  compileSelect () {
-    const prefix = !this.isDistinct ? 'select' : 'select distinct'
+  collect () {
+    const sql = this.assembleSql()
+    const params = this.assembleParams()
 
-    return !this.columns.length
-      ? `${prefix} *`
-      : `${prefix} ${this.columns.join(', ')}`
+    return { sql, params }
   }
 
-  compileFrom () {
-    const prefix = 'from'
-
-    return `${prefix} ${this.from}`
+  get () {
+    return this.connection.get(this.collect())
   }
 
-  compileWhere () {
-    let prefix = 'where'
-
-    return !this.wheres.length
-      ? ''
-      : this.wheres.map((where, index) => {
-        prefix = index ? ` ${where.boolean}` : prefix
-
-        switch (where.type) {
-          case 'NotNull': return `${prefix} ${where.column} is not null`
-          case 'Null': return `${prefix} ${where.column} is null`
-          case 'Nested': return where.query.compileWhere()
-
-          default: return `${prefix} ${where.column} ${where.operator} ?`
-        }
-      }).join('')
+  first () {
+    return this.connection.first(this.collect())
   }
 }

@@ -47,7 +47,7 @@ export default class SQLiteGrammar extends Grammar {
   }
 
   compileUpdate (query, values) {
-    if (query.hasOwnProperty('joins') || query.hasOwnProperty('limit')) {
+    if (Object.prototype.hasOwnProperty.call(query, 'joins') || Object.prototype.hasOwnProperty.call(query, 'limit')) {
       return this.compileUpdateWithJoinsOrLimit(query, values)
     }
     return super.compileUpdate(query, values)
