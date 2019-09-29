@@ -1,4 +1,5 @@
 import RNSQLiteConnection from './RNSQLiteConnection'
+import SQLiteGrammar from './SQLiteGrammar'
 
 /**
  * Connections connections registry
@@ -7,6 +8,10 @@ import RNSQLiteConnection from './RNSQLiteConnection'
  */
 const connections = {
   'rn-sqlite': RNSQLiteConnection
+}
+
+const grammars = {
+  'rn-sqlite': SQLiteGrammar
 }
 
 export default class Database {
@@ -20,6 +25,7 @@ export default class Database {
     }
 
     this.Connection = connections[config.type]
+    this.Grammar = grammars[config.type]
     this.database = this.Connection.connect(config)
   }
 }

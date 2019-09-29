@@ -1,6 +1,5 @@
 import Database from './Database'
 import Expression from './Expression'
-import Grammar from './SQLiteGrammar'
 import {
   isString,
   isBoolean,
@@ -49,7 +48,7 @@ export default class Builder {
     this.unionOffset = null
     this.unionOrders = null
     this.lock = null
-    this.grammar = new Grammar()
+    this.grammar = new Database.Grammar()
     this.connection = new Database.Connection()
   }
 
