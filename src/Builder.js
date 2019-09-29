@@ -1014,7 +1014,7 @@ export default class Builder {
    * @returns {Tree | * | any[]}
    */
   getBindings () {
-    return this.bindings.flat()
+    return Object.values(this.bindings).flat()
   }
 
   static prepareValueAndOperator (value, operator, useDefault = false) {
@@ -1161,203 +1161,9 @@ export default class Builder {
    *
    * @returns {string}
    */
-  compileSelect () {
-    const prefix = !this.isDistinct ? 'select' : 'select distinct'
-
-    return !this.columns.length
-      ? `${prefix} *`
-      : `${prefix} ${this.columns.join(', ')}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileFrom () {
-    const prefix = 'from'
-
-    return `${prefix} ${this.from}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileWhere () {
-    let prefix = 'where'
-    let placeholder = null
-
-    return !this.wheres.length
-      ? ''
-      : this.wheres.map((where, index) => {
-        prefix = index ? ` ${where.boolean}` : prefix
-        placeholder = this.getPlaceholder(where.type, where.values)
-
-        switch (where.type) {
-          case 'NotNull': return `${prefix} ${where.column} is not null`
-          case 'Null': return `${prefix} ${where.column} is null`
-          case 'Nested': return where.query.compileWhere()
-          case 'NotBetween': return `${prefix} ${where.column} not between ${placeholder} and ${placeholder}`
-          case 'Between': return `${prefix} ${where.column} between ${placeholder} and ${placeholder}`
-          case 'NotIn': return `${prefix} ${where.column} not in (${placeholder})`
-          case 'In': return `${prefix} ${where.column} in (${placeholder})`
-          case 'Date': return this.grammar.whereDate(this, where)
-          case 'Day': return this.grammar.whereDay(this, where)
-          case 'Month': return this.grammar.whereMonth(this, where)
-          case 'Year': return this.grammar.whereYear(this, where)
-          case 'Time': return this.grammar.whereTime(this, where)
-          case 'Column': return `${prefix} ${where.first} ${where.operator} ${where.second}`
-
-          default: return `${prefix} ${where.column} ${where.operator} ?`
-        }
-      }).join('')
-  }
-
-  /**
-   *
-   * @param type
-   * @param values
-   * @returns {*|SourceNode|string|string}
-   */
-  getPlaceholder (type, values) {
-    if (type === 'NotIn' || type === 'In') {
-      return values.map(() => '?').join(', ')
-    }
-
-    return '?'
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileGroupBy () {
-    if (!this.groups.length) return ''
-    const prefix = 'group by'
-
-    return `${prefix} ${this.groups.join(', ')}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileOrderBy () {
-    if (!this.orders.length) return ''
-    const prefix = 'order by'
-
-    return `${prefix} ${this.orders.map(order => `${order.column} ${order.direction}`).join(', ')}`
-  }
-
-  /**
-   *
-   * @returns {*}
-   */
-  compileHaving () {
-    // If the having clause is "raw", we can just return the clause straight away
-    // without doing any more processing on it. Otherwise, we will compile the
-    // clause into SQL based on the components that make it up from builder.
-    return !this.havings.length
-      ? ''
-      : this.havings.map(having => {
-        if (having.type === 'Raw') {
-          return `${having.boolean} ${having.sql}`
-        } else if (having.type === 'between') {
-          return this.compileHavingBetween(having)
-        }
-
-        return this.compileBasicHaving(having)
-      }).join(' ')
-  }
-
-  /**
-   *
-   * @param having
-   * @returns {string}
-   */
-  compileBasicHaving (having) {
-    const column = this.grammar.wrap(having.column)
-
-    const parameter = Grammar.parameter(having.value)
-
-    return `${having.boolean} ${column} ${having.operator} ${parameter}`
-  }
-
-  /**
-   *
-   * @param having
-   * @returns {string}
-   */
-  compileHavingBetween (having) {
-    const between = having.not ? 'not between' : 'between'
-
-    const column = this.grammar.wrap(having.column)
-
-    const min = Grammar.parameter(having.values[0])
-
-    const max = Grammar.parameter(having.values[having.values.length - 1])
-
-    return `${having.boolean} ${column} ${between} ${min} and ${max}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileOffset () {
-    if (this.offset) return ''
-    return `offset ${isString(this.offset) ? parseInt(this.offset) : this.offset}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  compileLimit () {
-    if (this.limit) return ''
-    return `limit ${isString(this.limit) ? parseInt(this.limit) : this.limit}`
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
   toSql () {
-    // TODO
-    // return this.grammar.compileSelect(this)
-    return this.compileSelect(this)
-  }
-
-  /**
-   *
-   * @returns {string}
-   */
-  assembleSql () {
-    const select = this.compileSelect()
-    const from = this.compileFrom()
-    const where = this.compileWhere()
-    const groupBy = this.compileGroupBy()
-    const orderBy = this.compileOrderBy()
-    const having = this.compileHaving()
-    const offset = this.compileOffset()
-    const limit = this.compileLimit()
-
-    return `${select} ${from} ${where} ${groupBy} ${orderBy} ${having} ${offset} ${limit}`
-  }
-
-  /**
-   *
-   * @returns {Array}
-   */
-  assembleParams () {
-    let params = []
-    Object.values(this.bindings).forEach(binding => {
-      if (binding.length) {
-        params = [...params, ...binding]
-      }
-    })
-
-    return params
+    return this.grammar.compileSelect(this)
+    // return this.compileSelect()
   }
 
   /**
@@ -1365,8 +1171,8 @@ export default class Builder {
    * @returns {{params: *, sql: *}}
    */
   collect () {
-    const sql = this.assembleSql()
-    const params = this.assembleParams()
+    const sql = this.toSql()
+    const params = this.getBindings()
 
     return { sql, params }
   }
@@ -1386,4 +1192,182 @@ export default class Builder {
   first () {
     return this.connection.first(this.collect())
   }
+
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // assembleSql () {
+  //   const select = this.compileSelect()
+  //   const from = this.compileFrom()
+  //   const where = this.compileWhere()
+  //   const groupBy = this.compileGroupBy()
+  //   const orderBy = this.compileOrderBy()
+  //   const having = this.compileHaving()
+  //   const offset = this.compileOffset()
+  //   const limit = this.compileLimit()
+  //
+  //   return `${select} ${from} ${where} ${groupBy} ${orderBy} ${having} ${offset} ${limit}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileSelect () {
+  //   const prefix = !this.isDistinct ? 'select' : 'select distinct'
+  //
+  //   return !this.columns.length
+  //     ? `${prefix} *`
+  //     : `${prefix} ${this.columns.join(', ')}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileFrom () {
+  //   const prefix = 'from'
+  //
+  //   return `${prefix} ${this.from}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileWhere () {
+  //   let prefix = 'where'
+  //   let placeholder = null
+  //
+  //   return !this.wheres.length
+  //     ? ''
+  //     : this.wheres.map((where, index) => {
+  //       prefix = index ? ` ${where.boolean}` : prefix
+  //       placeholder = this.getPlaceholder(where.type, where.values)
+  //
+  //       switch (where.type) {
+  //         case 'NotNull': return `${prefix} ${where.column} is not null`
+  //         case 'Null': return `${prefix} ${where.column} is null`
+  //         case 'Nested': return where.query.compileWhere()
+  //         case 'NotBetween': return `${prefix} ${where.column} not between ${placeholder} and ${placeholder}`
+  //         case 'Between': return `${prefix} ${where.column} between ${placeholder} and ${placeholder}`
+  //         case 'NotIn': return `${prefix} ${where.column} not in (${placeholder})`
+  //         case 'In': return `${prefix} ${where.column} in (${placeholder})`
+  //         case 'Date': return this.grammar.whereDate(this, where)
+  //         case 'Day': return this.grammar.whereDay(this, where)
+  //         case 'Month': return this.grammar.whereMonth(this, where)
+  //         case 'Year': return this.grammar.whereYear(this, where)
+  //         case 'Time': return this.grammar.whereTime(this, where)
+  //         case 'Column': return `${prefix} ${where.first} ${where.operator} ${where.second}`
+  //
+  //         default: return `${prefix} ${where.column} ${where.operator} ?`
+  //       }
+  //     }).join('')
+  // }
+  //
+  // /**
+  //  *
+  //  * @param type
+  //  * @param values
+  //  * @returns {*|SourceNode|string|string}
+  //  */
+  // getPlaceholder (type, values) {
+  //   if (type === 'NotIn' || type === 'In') {
+  //     return values.map(() => '?').join(', ')
+  //   }
+  //
+  //   return '?'
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileGroupBy () {
+  //   if (!this.groups.length) return ''
+  //   const prefix = 'group by'
+  //
+  //   return `${prefix} ${this.groups.join(', ')}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileOrderBy () {
+  //   if (!this.orders.length) return ''
+  //   const prefix = 'order by'
+  //
+  //   return `${prefix} ${this.orders.map(order => `${order.column} ${order.direction}`).join(', ')}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {*}
+  //  */
+  // compileHaving () {
+  //   // If the having clause is "raw", we can just return the clause straight away
+  //   // without doing any more processing on it. Otherwise, we will compile the
+  //   // clause into SQL based on the components that make it up from builder.
+  //   return !this.havings.length
+  //     ? ''
+  //     : this.havings.map(having => {
+  //       if (having.type === 'Raw') {
+  //         return `${having.boolean} ${having.sql}`
+  //       } else if (having.type === 'between') {
+  //         return this.compileHavingBetween(having)
+  //       }
+  //
+  //       return this.compileBasicHaving(having)
+  //     }).join(' ')
+  // }
+  //
+  // /**
+  //  *
+  //  * @param having
+  //  * @returns {string}
+  //  */
+  // compileBasicHaving (having) {
+  //   const column = this.grammar.wrap(having.column)
+  //
+  //   const parameter = Grammar.parameter(having.value)
+  //
+  //   return `${having.boolean} ${column} ${having.operator} ${parameter}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @param having
+  //  * @returns {string}
+  //  */
+  // compileHavingBetween (having) {
+  //   const between = having.not ? 'not between' : 'between'
+  //
+  //   const column = this.grammar.wrap(having.column)
+  //
+  //   const min = Grammar.parameter(having.values[0])
+  //
+  //   const max = Grammar.parameter(having.values[having.values.length - 1])
+  //
+  //   return `${having.boolean} ${column} ${between} ${min} and ${max}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileOffset () {
+  //   if (this.offset) return ''
+  //   return `offset ${isString(this.offset) ? parseInt(this.offset) : this.offset}`
+  // }
+  //
+  // /**
+  //  *
+  //  * @returns {string}
+  //  */
+  // compileLimit () {
+  //   if (this.limit) return ''
+  //   return `limit ${isString(this.limit) ? parseInt(this.limit) : this.limit}`
+  // }
 }

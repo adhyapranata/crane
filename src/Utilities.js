@@ -78,6 +78,6 @@ export function objectVal (obj) {
   return Object.values(obj)[0]
 }
 
-export function upperCaseFirstLetter(str) {
-  return `${str.charAt(0).toUpperCase()}${str.slice(1)}`;
+export function upperCaseFirstLetter (str) {
+  return `${str.charAt(0).toUpperCase()}${str.slice(1)}`
 }
