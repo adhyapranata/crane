@@ -1,4 +1,4 @@
-import SQLiteConnection from './SQLiteConnection'
+import Database from './Database'
 import Expression from './Expression'
 import Grammar from './SQLiteGrammar'
 import {
@@ -50,15 +50,28 @@ export default class Builder {
     this.unionOrders = null
     this.lock = null
     this.grammar = new Grammar()
-    this.connection = new SQLiteConnection()
+    this.connection = new Database.Connection()
   }
 
+  /**
+   * Set the table which the query is targeting.
+   *
+   * @param table
+   * @param as
+   * @returns {Builder}
+   */
   table (table, as = null) {
     this.from = as ? `${table} as ${as}` : table
 
     return this
   }
 
+  /**
+   * Set the columns to be selected.
+   *
+   * @param columns
+   * @returns {Builder}
+   */
   select (columns = ['*']) {
     const checkedColumns = Array.isArray(columns) ? columns : [...arguments]
     let as = null
@@ -77,6 +90,13 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a new "raw" select expression to the query.
+   *
+   * @param expression
+   * @param bindings
+   * @returns {Builder}
+   */
   selectRaw (expression, bindings = []) {
     this.addSelect((new Expression(expression)).getValue())
     if (bindings) {
@@ -86,6 +106,12 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a new select column to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   addSelect (column) {
     const columns = Array.isArray(column) ? column : arguments
     let as = null
@@ -105,12 +131,26 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Force the query to only return distinct results.
+   *
+   * @returns {Builder}
+   */
   distinct () {
     this.isDistinct = true
 
     return this
   }
 
+  /**
+   * Add a basic where clause to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {Builder|*}
+   */
   where (column, operator = null, value = null, boolean = 'and') {
     if (Array.isArray(column)) {
       return this.addArrayOfWheres(column, boolean)
@@ -160,6 +200,14 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add an "or where" clause to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {Builder|*}
+   */
   orWhere (column, operator = null, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -168,6 +216,15 @@ export default class Builder {
     return this.where(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a where between statement to the query.
+   *
+   * @param column
+   * @param values
+   * @param boolean
+   * @param not
+   * @returns {Builder}
+   */
   whereBetween (column, values, boolean = 'and', not = false) {
     const type = not ? 'NotBetween' : 'Between'
 
@@ -178,18 +235,48 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add an or where between statement to the query.
+   *
+   * @param column
+   * @param values
+   * @returns {Builder}
+   */
   orWhereBetween (column, values) {
     return this.whereBetween(column, values, 'or')
   }
 
+  /**
+   * Add a where not between statement to the query.
+   *
+   * @param column
+   * @param values
+   * @param boolean
+   * @returns {Builder}
+   */
   whereNotBetween (column, values, boolean = 'and') {
     return this.whereBetween(column, values, boolean, true)
   }
 
+  /**
+   * Add an or where not between statement to the query.
+   *
+   * @param column
+   * @param values
+   * @returns {Builder}
+   */
   orWhereNotBetween (column, values) {
     return this.whereNotBetween(column, values, 'or')
   }
 
+  /**
+   * Add a "where null" clause to the query.
+   *
+   * @param columns
+   * @param boolean
+   * @param not
+   * @returns {Builder}
+   */
   whereNull (columns, boolean = 'and', not = false) {
     const type = not ? 'NotNull' : 'Null'
     Builder.wrap(columns).forEach(column => {
@@ -199,18 +286,46 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add an "or where null" clause to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   orWhereNull (column) {
     return this.whereNull(column, 'or')
   }
 
+  /**
+   * Add a "where not null" clause to the query.
+   *
+   * @param column
+   * @param boolean
+   * @returns {Builder}
+   */
   whereNotNull (column, boolean = 'and') {
     return this.whereNull(column, boolean, true)
   }
 
+  /**
+   * Add an "or where not null" clause to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   orWhereNotNull (column) {
     return this.whereNotNull(column, 'or')
   }
 
+  /**
+   * Add a "where in" clause to the query.
+   *
+   * @param column
+   * @param values
+   * @param boolean
+   * @param not
+   * @returns {Builder}
+   */
   whereIn (column, values, boolean = 'and', not = false) {
     const type = not ? 'NotIn' : 'In'
 
@@ -221,18 +336,49 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add an "or where in" clause to the query.
+   *
+   * @param column
+   * @param values
+   * @returns {Builder}
+   */
   orWhereIn (column, values) {
     return this.whereIn(column, values, 'or')
   }
 
+  /**
+   * Add a "where not in" clause to the query.
+   *
+   * @param column
+   * @param values
+   * @param boolean
+   * @returns {Builder}
+   */
   whereNotIn (column, values, boolean = 'and') {
     return this.whereIn(column, values, boolean, true)
   }
 
+  /**
+   * Add an "or where not in" clause to the query.
+   *
+   * @param column
+   * @param values
+   * @returns {Builder}
+   */
   orWhereNotIn (column, values) {
     return this.whereNotIn(column, values, 'or')
   }
 
+  /**
+   * Add a "where date" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {*}
+   */
   whereDate (column, operator, value = null, boolean = 'and') {
     let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -245,6 +391,14 @@ export default class Builder {
     return this.addDateBasedWhere('Date', column, checkedOperator, checkedValue, boolean)
   }
 
+  /**
+   * Add an "or where date" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {*}
+   */
   orWhereDate (column, operator, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -253,6 +407,15 @@ export default class Builder {
     return this.whereDate(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a "where time" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {*}
+   */
   whereTime (column, operator, value = null, boolean = 'and') {
     let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -265,6 +428,14 @@ export default class Builder {
     return this.addDateBasedWhere('Time', column, checkedOperator, checkedValue, boolean)
   }
 
+  /**
+   * Add an "or where time" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {*}
+   */
   orWhereTime (column, operator, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -273,6 +444,15 @@ export default class Builder {
     return this.whereTime(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a "where day" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {*}
+   */
   whereDay (column, operator, value = null, boolean = 'and') {
     let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -289,6 +469,14 @@ export default class Builder {
     return this.addDateBasedWhere('Day', column, checkedOperator, checkedValue, boolean)
   }
 
+  /**
+   * Add an "or where day" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {*}
+   */
   orWhereDay (column, operator, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -297,6 +485,15 @@ export default class Builder {
     return this.whereDay(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a "where month" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {*}
+   */
   whereMonth (column, operator, value = null, boolean = 'and') {
     let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -313,6 +510,14 @@ export default class Builder {
     return this.addDateBasedWhere('Month', column, checkedOperator, value, boolean)
   }
 
+  /**
+   * Add an "or where month" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {*}
+   */
   orWhereMonth (column, operator, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -321,6 +526,15 @@ export default class Builder {
     return this.whereMonth(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a "where year" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {*}
+   */
   whereYear (column, operator, value = null, boolean = 'and') {
     let { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -333,6 +547,14 @@ export default class Builder {
     return this.addDateBasedWhere('Year', column, checkedOperator, checkedValue, boolean)
   }
 
+  /**
+   * Add an "or where year" statement to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {*}
+   */
   orWhereYear (column, operator, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -341,6 +563,16 @@ export default class Builder {
     return this.whereYear(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a date based (year, month, day, time) statement to the query.
+   *
+   * @param type
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {Builder}
+   */
   addDateBasedWhere (type, column, operator, value, boolean = 'and') {
     this.wheres = [...this.wheres, { column, type, boolean, operator, value }]
 
@@ -351,6 +583,15 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a "where" clause comparing two columns to the query.
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @param boolean
+   * @returns {Builder|*}
+   */
   whereColumn (first, operator = null, second = null, boolean = 'and') {
     // If the column is an array, we will assume it is an array of key-value pairs
     // and can add them each as a where clause. We will maintain the boolean we
@@ -377,10 +618,24 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add an "or where" clause comparing two columns to the query.
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @returns {Builder|*}
+   */
   orWhereColumn (first, operator = null, second = null) {
     return this.whereColumn(first, operator, second, 'or')
   }
 
+  /**
+   * Add a "group by" clause to the query.
+   *
+   * @param groups
+   * @returns {Builder}
+   */
   groupBy (...groups) {
     groups.forEach(group => {
       this.groups = [...this.groups, group]
@@ -389,6 +644,15 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a "having" clause to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @param boolean
+   * @returns {Builder}
+   */
   having (column, operator = null, value = null, boolean = 'and') {
     const type = 'Basic'
 
@@ -416,6 +680,14 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a "or having" clause to the query.
+   *
+   * @param column
+   * @param operator
+   * @param value
+   * @returns {Builder}
+   */
   orHaving (column, operator = null, value = null) {
     const { checkedValue, checkedOperator } = Builder.prepareValueAndOperator(
       value, operator, arguments.length === 2
@@ -424,6 +696,15 @@ export default class Builder {
     return this.having(column, checkedOperator, checkedValue, 'or')
   }
 
+  /**
+   * Add a "having between " clause to the query.
+   *
+   * @param column
+   * @param values
+   * @param boolean
+   * @param not
+   * @returns {Builder}
+   */
   havingBetween (column, values, boolean = 'and', not = false) {
     const type = 'between'
 
@@ -434,6 +715,14 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a raw having clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @param boolean
+   * @returns {Builder}
+   */
   havingRaw (sql, bindings = [], boolean = 'and') {
     const type = 'Raw'
 
@@ -444,10 +733,24 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a raw or having clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @returns {Builder}
+   */
   orHavingRaw (sql, bindings = []) {
     return this.havingRaw(sql, bindings, 'or')
   }
 
+  /**
+   * Add an "order by" clause to the query.
+   *
+   * @param column
+   * @param direction
+   * @returns {Builder}
+   */
   orderBy (column, direction = 'asc') {
     const orderType = this.unions ? 'unionOrders' : 'orders'
 
@@ -471,22 +774,53 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a descending "order by" clause to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   orderByDesc (column) {
     return this.orderBy(column, 'desc')
   }
 
+  /**
+   * Add an "order by" clause for a timestamp to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   latest (column = 'created_at') {
     return this.orderBy(column, 'desc')
   }
 
+  /**
+   * Add an "order by" clause for a timestamp to the query.
+   *
+   * @param column
+   * @returns {Builder}
+   */
   oldest (column = 'created_at') {
     return this.orderBy(column, 'asc')
   }
 
+  /**
+   * Put the query's results in random order.
+   *
+   * @param seed
+   * @returns {*}
+   */
   inRandomOrder (seed = '') {
     return this.orderByRaw(this.grammar.compileRandom(seed))
   }
 
+  /**
+   * Add a raw "order by" clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @returns {Builder}
+   */
   orderByRaw (sql, bindings = []) {
     const type = 'Raw'
     const orderType = this.unions ? 'unionOrders' : 'orders'
@@ -498,6 +832,12 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Alias to set the "offset" value of the query.
+   *
+   * @param value
+   * @returns {Builder}
+   */
   skip (value) {
     const property = this.unions ? 'unionOffset' : 'offset'
 
@@ -506,6 +846,12 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Alias to set the "limit" value of the query.
+   *
+   * @param value
+   * @returns {Builder}
+   */
   take (value) {
     const property = this.unions ? 'unionLimit' : 'limit'
 
@@ -516,10 +862,24 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Set the limit and offset for a given page.
+   *
+   * @param page
+   * @param perPage
+   * @returns {Builder}
+   */
   forPage (page, perPage = 15) {
     return this.skip((page - 1) * perPage).take(perPage)
   }
 
+  /**
+   * Add a union statement to the query.
+   *
+   * @param query
+   * @param all
+   * @returns {Builder}
+   */
   union (query, all = false) {
     if (isFunction(query)) {
       query(Builder.newQuery())
@@ -532,18 +892,43 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Add a union all statement to the query.
+   *
+   * @param query
+   * @returns {Builder}
+   */
   unionAll (query) {
     return this.union(query, true)
   }
 
+  /**
+   * Create a raw database expression.
+   *
+   * @param value
+   * @returns {*}
+   */
   static raw (value) {
     return (new Expression(value)).getValue()
   }
 
+  /**
+   * Remove all of the expressions from a list of bindings.
+   *
+   * @param bindings
+   * @returns {*}
+   */
   cleanBindings (bindings) {
     return bindings.filter(binding => !(binding instanceof Expression))
   }
 
+  /**
+   * Add a subselect expression to the query.
+   *
+   * @param query
+   * @param as
+   * @returns {Builder}
+   */
   selectSub (query, as) {
     const { checkedQuery, bindings } = Builder.createSub(query)
     return this.selectRaw(
@@ -551,6 +936,15 @@ export default class Builder {
     )
   }
 
+  /**
+   * Add a full sub-select to the query.
+   *
+   * @param column
+   * @param operator
+   * @param callback
+   * @param boolean
+   * @returns {Builder}
+   */
   whereSub (column, operator, callback, boolean) {
     const type = 'Sub'
     const query = Builder.forSubQuery()
@@ -562,6 +956,12 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Creates a subquery and parse it.
+   *
+   * @param query
+   * @returns {[*, *]|[*, []]}
+   */
   static createSub (query) {
     if (isFunction(query)) {
       const callback = query
@@ -571,6 +971,12 @@ export default class Builder {
     return Builder.parseSub(query)
   }
 
+  /**
+   * Parse the subquery into SQL and bindings.
+   *
+   * @param query
+   * @returns {*[]}
+   */
   static parseSub (query) {
     if (query instanceof Builder) {
       return [query.toSql(), query.getBindings()]
@@ -581,6 +987,13 @@ export default class Builder {
     }
   }
 
+  /**
+   * Add a binding to the query.
+   *
+   * @param value
+   * @param type
+   * @returns {Builder}
+   */
   addBinding (value, type = 'where') {
     if (!Builder.hasKey(this.bindings, type)) {
       throw new Error('Invalid binding type: {type}.')
@@ -595,6 +1008,11 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Get the current query value bindings in a flattened array.
+   *
+   * @returns {Tree | * | any[]}
+   */
   getBindings () {
     return this.bindings.flat()
   }
@@ -608,16 +1026,39 @@ export default class Builder {
     return { checkedValue: value, checkedOperator: operator }
   }
 
+  /**
+   * Determine if the given operator and value combination is legal.
+   *
+   * Prevents using Null values with invalid operators.
+   *
+   * @param operator
+   * @param value
+   * @returns {*|boolean}
+   */
   static invalidOperatorAndValue (operator, value) {
     return isNull(value) &&
       operators.find(op => op === operator) &&
       !['=', '<>', '!='].find(op => op === operator)
   }
 
+  /**
+   * Determine if the given operator is supported.
+   *
+   * @param target
+   * @returns {boolean}
+   */
   static invalidOperator (target) {
     return !operators.find(operator => operator === target)
   }
 
+  /**
+   * Add an array of where clauses to the query.
+   *
+   * @param column
+   * @param boolean
+   * @param method
+   * @returns {*}
+   */
   addArrayOfWheres (column, boolean, method = 'where') {
     return this.whereNested(query => {
       column.forEach(value => {
@@ -632,15 +1073,34 @@ export default class Builder {
     }, boolean)
   }
 
+  /**
+   * Add a nested where statement to the query.
+   *
+   * @param callback
+   * @param boolean
+   * @returns {*}
+   */
   whereNested (callback, boolean = 'and') {
     const query = callback(this.forNestedWhere())
     return this.addNestedWhereQuery(query, boolean)
   }
 
+  /**
+   * Create a new query instance for nested where condition.
+   *
+   * @returns {Builder}
+   */
   forNestedWhere () {
     return Builder.newQuery().table(this.from)
   }
 
+  /**
+   * Add another query builder as a nested where to the query builder.
+   *
+   * @param query
+   * @param boolean
+   * @returns {Builder}
+   */
   addNestedWhereQuery (query, boolean = 'and') {
     if (query.wheres.length) {
       const type = 'Nested'
@@ -651,26 +1111,56 @@ export default class Builder {
     return this
   }
 
+  /**
+   * Get the raw array of bindings.
+   *
+   * @returns {{select: [], having: [], where: [], join: [], union: [], order: []}|*}
+   */
   getRawBindings () {
     return this.bindings
   }
 
+  /**
+   * Create a new query instance for a sub-query.
+   *
+   * @returns {Builder}
+   */
   static forSubQuery () {
     return Builder.newQuery()
   }
 
+  /**
+   * Get a new instance of the query builder.
+   *
+   * @returns {Builder}
+   */
   static newQuery () {
     return new Builder()
   }
 
+  /**
+   *
+   * @param value
+   * @returns {*[]}
+   */
   static wrap (value) {
     return !Array.isArray(value) ? [value] : value
   }
 
+  /**
+   *
+   * @param target
+   * @param key
+   * @returns {*|boolean}
+   */
   static hasKey (target, key) {
     return isObject(target) && Object.prototype.hasOwnProperty.call(target, key)
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileSelect () {
     const prefix = !this.isDistinct ? 'select' : 'select distinct'
 
@@ -679,12 +1169,20 @@ export default class Builder {
       : `${prefix} ${this.columns.join(', ')}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileFrom () {
     const prefix = 'from'
 
     return `${prefix} ${this.from}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileWhere () {
     let prefix = 'where'
     let placeholder = null
@@ -715,6 +1213,12 @@ export default class Builder {
       }).join('')
   }
 
+  /**
+   *
+   * @param type
+   * @param values
+   * @returns {*|SourceNode|string|string}
+   */
   getPlaceholder (type, values) {
     if (type === 'NotIn' || type === 'In') {
       return values.map(() => '?').join(', ')
@@ -723,6 +1227,10 @@ export default class Builder {
     return '?'
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileGroupBy () {
     if (!this.groups.length) return ''
     const prefix = 'group by'
@@ -730,6 +1238,10 @@ export default class Builder {
     return `${prefix} ${this.groups.join(', ')}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileOrderBy () {
     if (!this.orders.length) return ''
     const prefix = 'order by'
@@ -737,6 +1249,10 @@ export default class Builder {
     return `${prefix} ${this.orders.map(order => `${order.column} ${order.direction}`).join(', ')}`
   }
 
+  /**
+   *
+   * @returns {*}
+   */
   compileHaving () {
     // If the having clause is "raw", we can just return the clause straight away
     // without doing any more processing on it. Otherwise, we will compile the
@@ -744,9 +1260,9 @@ export default class Builder {
     return !this.havings.length
       ? ''
       : this.havings.map(having => {
-        if (having['type'] === 'Raw') {
-          return `${having['boolean']} ${having['sql']}`
-        } else if(having['type'] === 'between') {
+        if (having.type === 'Raw') {
+          return `${having.boolean} ${having.sql}`
+        } else if (having.type === 'between') {
           return this.compileHavingBetween(having)
         }
 
@@ -754,42 +1270,68 @@ export default class Builder {
       }).join(' ')
   }
 
+  /**
+   *
+   * @param having
+   * @returns {string}
+   */
   compileBasicHaving (having) {
-    const column = this.grammar.wrap(having['column'])
+    const column = this.grammar.wrap(having.column)
 
-    const parameter = Grammar.parameter(having['value'])
+    const parameter = Grammar.parameter(having.value)
 
-    return `${having['boolean']} ${column} ${having['operator']} ${parameter}`
+    return `${having.boolean} ${column} ${having.operator} ${parameter}`
   }
 
+  /**
+   *
+   * @param having
+   * @returns {string}
+   */
   compileHavingBetween (having) {
-    const between = having['not'] ? 'not between' : 'between'
+    const between = having.not ? 'not between' : 'between'
 
-    const column = this.grammar.wrap(having['column'])
+    const column = this.grammar.wrap(having.column)
 
-    const min = Grammar.parameter(having['values'][0])
+    const min = Grammar.parameter(having.values[0])
 
-    const max = Grammar.parameter(having['values'][having['values'].length - 1])
+    const max = Grammar.parameter(having.values[having.values.length - 1])
 
-    return `${having['boolean']} ${column} ${between} ${min} and ${max}`
+    return `${having.boolean} ${column} ${between} ${min} and ${max}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileOffset () {
     if (this.offset) return ''
     return `offset ${isString(this.offset) ? parseInt(this.offset) : this.offset}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   compileLimit () {
     if (this.limit) return ''
     return `limit ${isString(this.limit) ? parseInt(this.limit) : this.limit}`
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   toSql () {
     // TODO
     // return this.grammar.compileSelect(this)
     return this.compileSelect(this)
   }
 
+  /**
+   *
+   * @returns {string}
+   */
   assembleSql () {
     const select = this.compileSelect()
     const from = this.compileFrom()
@@ -803,6 +1345,10 @@ export default class Builder {
     return `${select} ${from} ${where} ${groupBy} ${orderBy} ${having} ${offset} ${limit}`
   }
 
+  /**
+   *
+   * @returns {Array}
+   */
   assembleParams () {
     let params = []
     Object.values(this.bindings).forEach(binding => {
@@ -814,6 +1360,10 @@ export default class Builder {
     return params
   }
 
+  /**
+   *
+   * @returns {{params: *, sql: *}}
+   */
   collect () {
     const sql = this.assembleSql()
     const params = this.assembleParams()
@@ -821,10 +1371,18 @@ export default class Builder {
     return { sql, params }
   }
 
+  /**
+   *
+   * @returns {*}
+   */
   get () {
     return this.connection.get(this.collect())
   }
 
+  /**
+   *
+   * @returns {*}
+   */
   first () {
     return this.connection.first(this.collect())
   }
