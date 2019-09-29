@@ -1,5 +1,5 @@
 import Builder from './src/Builder'
-import SQLiteConnection from './src/SQLiteConnection'
+import DB from './src/Database'
 
-export const DatabaseConnection = SQLiteConnection
+export const Database = DB
 export default new Builder()
