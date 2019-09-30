@@ -91,7 +91,7 @@ export default class Grammar {
    *
    * @param query
    * @param columns
-   * @returns {string}
+   * @returns {* | string}
    */
   compileColumns (query, columns) {
     if (!isNull(query.aggregate)) {
@@ -864,7 +864,7 @@ export default class Grammar {
   /**
    *
    * @param query
-   * @returns {{[p: string]: []}}
+   * @returns {*}
    */
   compileTruncate (query) {
     return {

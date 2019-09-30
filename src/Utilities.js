@@ -3,11 +3,26 @@
  * @param value
  * @returns {*}
  */
+export function head (value) {
+  if (Array.isArray(value) && value.length) {
+    return value[0]
+  }
+
+  throw new Error('The value should be an array')
+}
+
+/**
+ *
+ * @param value
+ * @returns {*}
+ */
 export function last (value) {
-  if (Array.isArray(value)) {
+  if (Array.isArray(value) && value.length) {
     const lastKey = value.length - 1
     return value[lastKey]
   }
+
+  throw new Error('The value should be an array')
 }
 
 /**
@@ -78,6 +93,11 @@ export function objectVal (obj) {
   return Object.values(obj)[0]
 }
 
+/**
+ *
+ * @param str
+ * @returns {string}
+ */
 export function upperCaseFirstLetter (str) {
   return `${str.charAt(0).toUpperCase()}${str.slice(1)}`
 }
