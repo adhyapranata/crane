@@ -37,11 +37,11 @@ What makes a good proposal?
 * Backwards-compatibility
 * Clear examples of how to reproduce any issue the proposal is addressing
 
-Once your proposal receives a `Approved` label you may go ahead and start work on your Pull Request.
+Once your proposal receives a `approved` label you may go ahead and start work on your Pull Request.
 
 If you are proposing a new tool or service please do due diligence. Does this tool already exist in a 3rd party project or library? Can we reuse it?
 
-Every effort will be made to work with contributors who do not follow the process. Your PR may be closed or marked as `Invalid` if it is left inactive, or the proposal cannot move into a `Approved` status.
+Every effort will be made to work with contributors who do not follow the process. Your PR may be closed or marked as `invalid` if it is left inactive, or the proposal cannot move into a `approved` status.
 
 #### Paperwork for Pull Requests
 
