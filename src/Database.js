@@ -1,5 +1,6 @@
 import RNSQLiteConnection from './RNSQLiteConnection'
 import SQLiteGrammar from './SQLiteGrammar'
+import { initializeBuilder } from '../index'
 
 /**
  * Connections connections registry
@@ -27,5 +28,7 @@ export default class Database {
     this.Connection = connections[config.type]
     this.Grammar = grammars[config.type]
     this.database = this.Connection.connect(config)
+
+    initializeBuilder()
   }
 }
