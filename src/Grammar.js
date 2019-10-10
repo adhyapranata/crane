@@ -1,5 +1,4 @@
 import Expression from './Expression'
-import JoinClause from './JoinClause'
 import { isString, isNull, isUndefined } from './DataType'
 import { upperCaseFirstLetter } from './Utilities'
 
@@ -172,7 +171,7 @@ export default class Grammar {
    * @returns {string}
    */
   concatenateWhereClauses (query, sql) {
-    const conjunction = query instanceof JoinClause ? 'on' : 'where'
+    const conjunction = query.hasOwnProperty('clause') && query.clause === 'join' ? 'on' : 'where'
 
     return `${conjunction} ${this.removeLeadingBoolean(sql.join(' '))}`
   }
@@ -371,7 +370,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereNested (query, where) {
-    const offset = query instanceof JoinClause ? 3 : 6
+    const offset = query.hasOwnProperty('clause') && query.clause === 'join' ? 3 : 6
 
     return `(${this.compileWheres(where.query).substring(offset)})`
   }
@@ -753,8 +752,8 @@ export default class Grammar {
     const where = this.compileWheres(query)
 
     return (!isUndefined(query.joins)
-      ? this.compileUpdateWithJoins(query, table, columns, where)
-      : this.compileUpdateWithoutJoins(query, table, columns, where)
+        ? this.compileUpdateWithJoins(query, table, columns, where)
+        : this.compileUpdateWithoutJoins(query, table, columns, where)
     ).trim()
   }
 
@@ -819,8 +818,8 @@ export default class Grammar {
     const where = this.compileWheres(query)
 
     return (!isUndefined(query.joins)
-      ? this.compileDeleteWithJoins(query, table, where)
-      : this.compileDeleteWithoutJoins(query, table, where)
+        ? this.compileDeleteWithJoins(query, table, where)
+        : this.compileDeleteWithoutJoins(query, table, where)
     ).trim()
   }
 

@@ -1,7 +1,7 @@
 import Builder from './Builder'
 import { isFunction } from './DataType'
 
-export default class JoinClause {
+export default class JoinClause extends Builder {
   /**
    *
    * @param parentQuery
@@ -9,7 +9,8 @@ export default class JoinClause {
    * @param table
    */
   constructor (parentQuery, type, table) {
-    // super()
+    super()
+    this.clause = 'join'
     this.type = type
     this.table = table
     this.parentClass = parentQuery.constructor.name
