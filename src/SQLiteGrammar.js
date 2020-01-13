@@ -127,8 +127,7 @@ export default class SQLiteGrammar extends Grammar {
     return values.map((value, key) => {
       const column = last(key.split('.'))
       return `${this.wrap(column)} = ${this.parameter(value)}`
-    }
-    ).join(', ')
+    }).join(', ')
   }
 
   /**
@@ -141,8 +140,7 @@ export default class SQLiteGrammar extends Grammar {
     const table = this.wrapTable(query.from)
     const columns = this.compileUpdateColumns(query, values)
     const alias = last(query.from.split(/\s+as\s+/i))
-    const selectSql = this.compileSelect(query.select(`${alias}.rowid`
-    ))
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
 
     return `update ${table} set ${columns} where ${this.wrap('rowid')} in (${selectSql})`
   }

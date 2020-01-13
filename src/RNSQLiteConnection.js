@@ -50,6 +50,7 @@ export default class RNSQLiteConnection {
    * @returns {Promise<unknown>}
    */
   executeSql (sql, params, resolve, reject) {
+    console.tron.log('sql, params, resolve, reject', {sql, params, resolve, reject});
     return this.executeBulkSql([sql], [params])
       .then(res => resolve(res))
       .catch(errors => reject(errors))
