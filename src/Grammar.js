@@ -55,13 +55,13 @@ export default class Grammar {
    * @returns {[]}
    */
   compileComponents (query) {
-    const sql = []
+    let sql = []
 
     this.selectComponents.forEach(component => {
-      if (!isUndefined(query.component) && !isNull(query.component)) {
+      if (!isUndefined(query[component]) && !isNull(query[component])) {
         const method = `compile${upperCaseFirstLetter(component)}`
 
-        sql[component] = this[method](query, query.component)
+        sql = [...sql, this[method](query, query[component])]
       }
     })
 
@@ -945,7 +945,7 @@ export default class Grammar {
       return Grammar.getValue(value)
     }
 
-    if (value.indexOf(' as ') !== false) {
+    if (value.includes(' as ') !== false) {
       return this.wrapAliasedValue(value, prefixAlias)
     }
 
@@ -1003,7 +1003,7 @@ export default class Grammar {
    */
   wrapTable (table) {
     if (!Grammar.isExpression(table)) {
-      return this.wrap(this.tablePrefix.table, true)
+      return this.wrap(`${this.tablePrefix}${table}`, true)
     }
     return Grammar.getValue(table)
   }
@@ -1084,7 +1084,7 @@ export default class Grammar {
    * @returns {boolean}
    */
   static isJsonSelector (value) {
-    return value.contains('->')
+    return value.includes('->')
   }
 
   /**

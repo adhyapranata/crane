@@ -1,5 +1,6 @@
 import RNSQLiteConnection from './RNSQLiteConnection'
 import SQLiteGrammar from './SQLiteGrammar'
+import ExpoSQLiteConnection from "./ExpoSQLiteConnection"
 
 /**
  * Connections connections registry
@@ -7,11 +8,13 @@ import SQLiteGrammar from './SQLiteGrammar'
  * @type {{'rn-sqlite': *}}
  */
 const connections = {
-  'rn-sqlite': RNSQLiteConnection
+  'rn-sqlite': RNSQLiteConnection,
+  'expo': ExpoSQLiteConnection
 }
 
 const grammars = {
-  'rn-sqlite': SQLiteGrammar
+  'rn-sqlite': SQLiteGrammar,
+  'expo': SQLiteGrammar
 }
 
 export default class Database {

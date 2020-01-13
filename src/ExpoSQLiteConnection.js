@@ -5,12 +5,12 @@ export default class RNSQLiteConnection {
    *
    * @param driver
    * @param name
-   * @param location
-   * @param createFromLocation
+   * @param version
+   * @param size
    * @returns {Database}
    */
-  static connect ({ driver, name, location, createFromLocation }) {
-    const db = driver.openDatabase({ name, location, createFromLocation })
+  static connect ({ driver, name, version, size }) {
+    const db = driver.openDatabase(name)
 
     db.exec([{ sql: 'PRAGMA foreign_keys = ON;', args: [] }], false, () =>
       console.log('Foreign keys turned on')
@@ -76,7 +76,7 @@ export default class RNSQLiteConnection {
               sql,
               params[index],
               (_, { rows, insertId }) => {
-                resolve({ rows: rows.raw(), insertId })
+                resolve({ rows: rows._array, insertId })
               },
               reject
             )
