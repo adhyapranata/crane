@@ -46,6 +46,8 @@ export default class Grammar {
 
     query.columns = original
 
+    sql = sql.replace(/"/g, '')
+
     return sql
   }
 
@@ -160,7 +162,7 @@ export default class Grammar {
    */
   compileWheresToArray (query) {
     return query.wheres.map(where => {
-      return `${where.boolean} ${this[`where[${where.type}]`](query, where)}`
+      return `${where.boolean} ${this[`where${where.type}`](query, where)}`
     })
   }
 
@@ -1104,7 +1106,7 @@ export default class Grammar {
    * @returns {*|void|string}
    */
   removeLeadingBoolean (value) {
-    return value.replace('/and |or /i', '', 1)
+    return value.replace(/and |or /i, '')
   }
 
   /**

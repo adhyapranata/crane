@@ -36,7 +36,7 @@ export default class Builder {
     this.columns = []
     this.isDistinct = false
     this.from = null
-    this.joins = null
+    this.joins = []
     this.wheres = []
     this.groups = null
     this.havings = null
@@ -870,6 +870,252 @@ export default class Builder {
    */
   forPage (page, perPage = 15) {
     return this.skip((page - 1) * perPage).take(perPage)
+  }
+
+  /**
+   * Add a join clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @param  where
+   * @return {Builder}
+   */
+  join (table, first, operator = null, second = null, type = 'inner', where = false) {
+    const join = this.newJoinClause(this, type, table)
+
+    if (isFunction(first)) {
+      first(join)
+
+      this.joins = [...this.joins, join]
+
+      this.addBinding(join.getBindings(), 'join')
+    } else {
+      const method = where ? 'where' : 'on'
+
+      this.joins = [...this.joins, join[method](first, operator, second)]
+
+      this.addBinding(join.getBindings(), 'join');
+    }
+
+    return this;
+  }
+
+  /**
+   * Add a "join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @return {Builder}
+   */
+  joinWhere (table, first, operator, second, type = 'inner') {
+    return this.join(table, first, operator, second, type, true)
+  }
+
+  /**
+   * Add a subquery join clause to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @param  where
+   * @return {Builder}
+   */
+  joinSub (query, as, first, operator = null, second = null, type = 'inner', where = false) {
+    const { checkedQuery, bindings } = Builder.createSub(query)
+
+    const expression = `(${checkedQuery}) as ${this.grammar.wrapTable(as)}`
+
+    this.addBinding(bindings, 'join')
+
+    return this.join(new Expression(expression), first, operator, second, type, where)
+  }
+
+  /**
+   * Add a left join to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoin (table, first, operator = null, second = null) {
+    return this.join(table, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a "join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoinWhere (table, first, operator, second) {
+    return this.joinWhere(table, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a subquery left join to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoinSub (query, as, first, operator = null, second = null) {
+    return this.joinSub(query, as, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a right join to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoin (table, first, operator = null, second = null) {
+    return this.join(table, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a "right join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoinWhere (table, first, operator, second) {
+    return this.joinWhere(table, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a subquery right join to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoinSub (query, as, first, operator = null, second = null) {
+    return this.joinSub(query, as, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a "cross join" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  crossJoin (table, first = null, operator = null, second = null) {
+    if (first) {
+      return this.join(table, first, operator, second, 'cross')
+    }
+
+    this.joins = [...this.joins, this.newJoinClause(this, 'cross', table)]
+
+    return this
+  }
+
+  /**
+   * Get a new join clause.
+   *
+   * @param  parentQuery
+   * @param  type
+   * @param  table
+   * @return JoinClause
+   */
+  newJoinClause (parentQuery, type, table) {
+    return this.createJoinClause(parentQuery, type, table)
+  }
+
+  /**
+   *
+   * @param parentQuery
+   * @param type
+   * @param table
+   */
+  createJoinClause (parentQuery, type, table) {
+    const builder = new Builder()
+    builder.clause = 'join'
+    builder.type = type
+    builder.table = table
+    builder.parentClass = parentQuery.constructor.name
+    return builder
+  }
+
+  /**
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @param boolean
+   * @returns {Builder|*}
+   */
+  on (first, operator = null, second = null, boolean = 'and') {
+    if (isFunction(first)) {
+      return this.whereNested(first, boolean)
+    }
+
+    return this.whereColumn(first, operator, second, boolean)
+  }
+
+  /**
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @returns {Builder|*}
+   */
+  orOn (first, operator = null, second = null) {
+    return this.on(first, operator, second, 'or')
+  }
+
+  /**
+   *
+   * @returns {JoinClause}
+   */
+  newQuery () {
+    return new JoinClause(this.newParentQuery(), this.type, this.table)
+  }
+
+  /**
+   *
+   * @returns {JoinClause|Builder}
+   */
+  forSubQuery () {
+    return this.newParentQuery().newQuery()
+  }
+
+  /**
+   *
+   * @returns {*}
+   */
+  newParentQuery () {
+    const ParentQuery = this.parentClass
+
+    return new ParentQuery()
   }
 
   /**

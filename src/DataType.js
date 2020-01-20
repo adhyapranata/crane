@@ -40,7 +40,7 @@ export function isObject (value) {
  * @returns {boolean}
  */
 export function isNull (value) {
-  return value === null
+  return value === null || (Array.isArray(value) && value.length === 0)
 }
 
 /**
