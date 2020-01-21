@@ -1,11 +1,12 @@
 import Database from './Database'
 import Expression from './Expression'
+import * as R from 'ramda'
 import {
   isString,
   isBoolean,
   isObject,
   isFunction,
-  isNull
+  isNull, isUndefined
 } from './DataType'
 import {
   objectKey,
@@ -1148,6 +1149,188 @@ export default class Builder {
   unionAll (query) {
     return this.union(query, true)
   }
+
+  /**
+   * Determine if any rows exist for the current query.
+   *
+   * @return bool
+   */
+  async exists () {
+    let results = await this.connection.get(
+      this.grammar.compileExists(this),
+      this.getBindings()
+    )
+
+    // If the results has rows, we will get the row and see if the exists column is a
+    // boolean true. If there is no results for this query we will return false as
+    // there are no rows for this query at all and we can return that info here.
+    if (!isUndefined(results[0])) {
+      results = results[0]
+      return !!results['exists']
+    }
+
+    return false
+  }
+
+  /**
+   * Determine if no rows exist for the current query.
+   *
+   * @return bool
+   */
+  async doesntExist () {
+    return ! await this.exists()
+  }
+
+  /**
+   * Execute the given callback if no rows exist for the current query.
+   *
+   * @param  callback
+   * @return mixed
+   */
+  async existsOr (callback) {
+    return await this.exists() ? true : callback()
+  }
+
+  /**
+   * Execute the given callback if rows exist for the current query.
+   *
+   * @param callback
+   * @return mixed
+   */
+  async doesntExistOr(callback) {
+    return await this.doesntExist() ? true : callback()
+  }
+
+  /**
+   * Retrieve the "count" result of the query.
+   *
+   * @param columns
+   * @return mixed
+   */
+  count (columns = '*') {
+    return this.startAggregate('count', Builder.wrap(columns))
+  }
+
+  /**
+   * Retrieve the minimum value of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  min (column) {
+    return this.startAggregate('min', [column])
+  }
+
+  /**
+   * Retrieve the maximum value of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  max (column) {
+    return this.startAggregate('max', [column])
+  }
+
+  /**
+   * Retrieve the sum of the values of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  async sum (column) {
+    const result = await this.startAggregate('sum', [column])
+    return result ? result : 0
+  }
+
+  /**
+   * Retrieve the average of the values of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  avg (column) {
+    return this.startAggregate('avg', [column])
+  }
+
+  /**
+   * Alias for the "avg" method.
+   *
+   * @param column
+   * @return mixed
+   */
+
+  average (column) {
+    return this.avg(column)
+  }
+
+  /**
+   * Execute an aggregate function on the database.
+   *
+   * @param functionName
+   * @param columns
+   * @return mixed
+   */
+  async startAggregate(functionName, columns = ['*']) {
+    const results = await this.cloneWithout(this.unions ? [] : ['columns'])
+      .cloneWithoutBindings(this.unions ? [] : ['select'])
+      .setAggregate(functionName, columns)
+      .get()
+
+    console.log('RESULT', results)
+
+    if (!results.isEmpty()) {
+      console.log('DONE', results)
+      // return array_change_key_case(results[0])['aggregate']
+    }
+  }
+
+  /**
+   * Set the aggregate property without running the query.
+   *
+   * @param functionName
+   * @param columns
+   * @return this
+   */
+  setAggregate(functionName, columns) {
+    this.aggregate = {functionName, columns}
+    if (isNull(this.groups)) {
+      this.orders = null
+      this.bindings['order'] = []
+    }
+    return this
+  }
+
+  /**
+   * Clone the query without the given properties.
+   *
+   * @param properties
+   * @return static
+   */
+  cloneWithout(properties) {
+    const clone = R.clone(this)
+
+    properties.forEach(property => {
+      clone[property] = null
+    })
+
+    return clone
+  }
+  /**
+   * Clone the query without the given bindings.
+   *
+   * @param except
+   * @return static
+   */
+  cloneWithoutBindings(except) {
+    const clone = R.clone(this)
+
+    except.forEach(type => {
+      clone.bindings[type] = []
+    })
+
+    return clone
+  }
+
 
   /**
    * Create a raw database expression.
