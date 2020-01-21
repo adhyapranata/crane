@@ -1,5 +1,5 @@
 import Expression from './Expression'
-import { isString, isNull, isUndefined } from './DataType'
+import { isString, isNull, isUndefined, isObject } from './DataType'
 import { upperCaseFirstLetter } from './Utilities'
 
 export default class Grammar {
@@ -624,15 +624,15 @@ export default class Grammar {
       sql += this.compileUnion(union)
     })
 
-    if (!query.unionOrders.length) {
+    if (!isNull(query.unionOrders)) {
       sql += ` ${this.compileOrders(query, query.unionOrders)}`
     }
 
-    if (!isUndefined(query.unionLimit)) {
+    if (!isUndefined(query.unionLimit) && !isNull(query.unionLimit)) {
       sql += ` ${this.compileLimit(query, query.unionLimit)}`
     }
 
-    if (!isUndefined(query.unionOffset)) {
+    if (!isUndefined(query.unionOffset) && !isNull(query.unionOffset)) {
       sql += ` ${this.compileOffset(query, query.unionOffset)}`
     }
 

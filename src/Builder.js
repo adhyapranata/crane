@@ -1130,6 +1130,8 @@ export default class Builder {
       query(Builder.newQuery())
     }
 
+    this.unions = isNull(this.unions) ? [] : this.unions
+
     this.unions = [...this.unions, { query, all }]
 
     this.addBinding(query.getBindings(), 'union')

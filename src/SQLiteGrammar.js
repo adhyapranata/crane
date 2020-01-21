@@ -17,8 +17,8 @@ export default class SQLiteGrammar extends Grammar {
    * @param sql
    * @returns {string}
    */
-  static wrapUnion (sql) {
-    return `select * from ${sql})`
+  wrapUnion (sql) {
+    return `select * from (${sql})`
   }
 
   /**
