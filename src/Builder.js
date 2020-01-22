@@ -1156,10 +1156,10 @@ export default class Builder {
    * @return bool
    */
   async exists () {
-    let results = await this.connection.get(
-      this.grammar.compileExists(this),
-      this.getBindings()
-    )
+    let results = await this.connection.get({
+      sql: this.grammar.compileExists(this),
+      params: this.getBindings()
+    })
 
     // If the results has rows, we will get the row and see if the exists column is a
     // boolean true. If there is no results for this query we will return false as
@@ -1271,16 +1271,14 @@ export default class Builder {
    * @return mixed
    */
   async startAggregate(functionName, columns = ['*']) {
-    const results = await this.cloneWithout(this.unions ? [] : ['columns'])
+    let results = this.cloneWithout(this.unions ? [] : ['columns'])
       .cloneWithoutBindings(this.unions ? [] : ['select'])
       .setAggregate(functionName, columns)
-      .get()
 
-    console.log('RESULT', results)
+    results = await results.get()
 
-    if (!results.isEmpty()) {
-      console.log('DONE', results)
-      // return array_change_key_case(results[0])['aggregate']
+    if (!isNull(results)) {
+      return results[0]['aggregate']
     }
   }
 
@@ -1293,10 +1291,12 @@ export default class Builder {
    */
   setAggregate(functionName, columns) {
     this.aggregate = {functionName, columns}
+
     if (isNull(this.groups)) {
       this.orders = null
       this.bindings['order'] = []
     }
+
     return this
   }
 
@@ -1306,8 +1306,8 @@ export default class Builder {
    * @param properties
    * @return static
    */
-  cloneWithout(properties) {
-    const clone = R.clone(this)
+  cloneWithout (properties) {
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
 
     properties.forEach(property => {
       clone[property] = null
@@ -1315,14 +1315,15 @@ export default class Builder {
 
     return clone
   }
+
   /**
    * Clone the query without the given bindings.
    *
    * @param except
    * @return static
    */
-  cloneWithoutBindings(except) {
-    const clone = R.clone(this)
+  cloneWithoutBindings (except) {
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
 
     except.forEach(type => {
       clone.bindings[type] = []

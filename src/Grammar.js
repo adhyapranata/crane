@@ -85,7 +85,7 @@ export default class Grammar {
       column = `distinct ${column}`
     }
 
-    return `select ${aggregate.function}(${column}) as aggregate`
+    return `select ${aggregate.functionName}(${column}) as aggregate`
   }
 
   /**
