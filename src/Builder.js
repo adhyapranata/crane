@@ -1750,16 +1750,24 @@ export default class Builder {
    * @param  values
    * @return boolean
    */
-  updateOrInsert(attributes, values = []) {
-    if (! this.where(attributes).exists()) {
-      return this.insert(attributes.merge(values))
+  async updateOrInsert(attributes, values = {}) {
+    if (! await this.where(...this.objectToArray(attributes)).exists()) {
+      return this.insert({...attributes, ...values})
     }
+
     if (isNull(values)) {
       return true
     }
 
     return !! this.take(1).update(values)
   }
+
+  objectToArray(obj) {
+    return Object.keys(obj).map(key => {
+      return [key, obj[key]]
+    }).flat()
+  }
+
   /**
    * Increment a column's value by a given amount.
    *

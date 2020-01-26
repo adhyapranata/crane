@@ -20,7 +20,8 @@ export default class RNSQLiteConnection {
   }
 
   get (props) {
-    return this.run(props)
+    const resolve = res => res[0].rows
+    return this.run({...props, resolve})
   }
 
   insert (props) {
