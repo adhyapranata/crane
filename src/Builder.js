@@ -1735,9 +1735,12 @@ export default class Builder {
    */
   update (values) {
     const sql = this.grammar.compileUpdate(this, values)
-    return this.connection.update(sql, this.cleanBindings(
-      this.grammar.prepareBindingsForUpdate(this.bindings, values)
-    ))
+    return this.connection.update({
+      sql,
+      params: this.cleanBindings(
+        this.grammar.prepareBindingsForUpdate(this.bindings, values)
+      )
+    })
   }
 
   /**

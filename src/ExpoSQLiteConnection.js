@@ -36,6 +36,10 @@ export default class RNSQLiteConnection {
     return this.run(props)
   }
 
+  update (props) {
+    return this.run(props)
+  }
+
   delete (props) {
     return this.run(props)
   }

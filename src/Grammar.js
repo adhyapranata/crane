@@ -755,7 +755,7 @@ export default class Grammar {
 
     const where = this.compileWheres(query)
 
-    return (!isUndefined(query.joins)
+    return (!isUndefined(query.joins) && !isNull(query.joins)
         ? this.compileUpdateWithJoins(query, table, columns, where)
         : this.compileUpdateWithoutJoins(query, table, columns, where)
     ).trim()
@@ -768,8 +768,8 @@ export default class Grammar {
    * @returns {SourceNode | * | string}
    */
   compileUpdateColumns (query, values) {
-    return values.map((value, key) => {
-      return `${this.wrap(key)} = ${Grammar.parameter(value)}`
+    return Object.keys(values).map(key => {
+      return `${this.wrap(key)} = ${Grammar.parameter(values[key])}`
     }).join(', ')
   }
 
@@ -808,7 +808,7 @@ export default class Grammar {
   prepareBindingsForUpdate (bindings, values) {
     const { select, join, ...cleanBindings } = bindings
 
-    return [...bindings.join, ...values, ...Object.values(cleanBindings).flat()]
+    return [...bindings.join, ...Object.values(values), ...Object.values(cleanBindings).flat()]
   }
 
   /**
