@@ -19,6 +19,27 @@ export default class RNSQLiteConnection {
     return db
   }
 
+  get (props) {
+    return this.run(props)
+  }
+
+  insert (props) {
+    return this.run(props)
+  }
+
+  processInsertGetId (props) {
+    const resolve = res => res[0].insertId
+    return this.run({...props, resolve})
+  }
+
+  affectingStatement (props) {
+    return this.run(props)
+  }
+
+  delete (props) {
+    return this.run(props)
+  }
+
   /**
    *
    * @param sql
@@ -27,10 +48,10 @@ export default class RNSQLiteConnection {
    * @param reject
    * @returns {*}
    */
-  get ({ sql, params, resolve, reject }) {
+  run ({ sql, params, resolve, reject }) {
     return this.executeSql(
       sql, params,
-      resolve || (res => res[0].rows),
+      resolve || (res => res),
       reject || (errors => {
         throw errors
       }))
@@ -58,7 +79,7 @@ export default class RNSQLiteConnection {
   executeSql (sql, params, resolve, reject) {
     return this.executeBulkSql([sql], [params])
       .then(res => resolve(res))
-      .catch(errors => reject(errors))
+      .catch((errors, message) => reject(errors, message))
   }
 
   /**
@@ -68,20 +89,22 @@ export default class RNSQLiteConnection {
    * @returns {Promise<unknown>}
    */
   executeBulkSql (sqls, params = []) {
-    return new Promise((resolve, reject) => {
+    return new Promise((txResolve, txReject) => {
       Database.database.transaction(tx => {
         Promise.all(sqls.map((sql, index) => {
-          return new Promise((resolve, reject) => {
+          return new Promise((sqlResolve, sqlReject) => {
             tx.executeSql(
               sql,
               params[index],
               (_, { rows, insertId }) => {
-                resolve({ rows: rows._array, insertId })
+                sqlResolve({ rows: rows._array, insertId })
               },
-              reject
+              (err, message) => {
+                sqlReject({err, message})
+              }
             )
           })
-        })).then(resolve).catch(reject)
+        })).then(txResolve).catch(txReject)
       })
     })
   }

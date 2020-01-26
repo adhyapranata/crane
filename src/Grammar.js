@@ -692,7 +692,7 @@ export default class Grammar {
   compileInsert (query, values) {
     const table = this.wrapTable(query.from)
 
-    if (!Array.isArray(values.length) && !Object.values(values).length) {
+    if (isNull(values)) {
       return `insert into ${table} default values`
     }
 
@@ -706,7 +706,9 @@ export default class Grammar {
       return `(${this.parameterize(record)})`
     }).join(', ')
 
-    return `insert into ${table} (${columns}) values ${parameters}`
+    let sql = `insert into ${table} (${columns}) values ${parameters}`
+
+    return sql.replace(/"/g, '')
   }
 
   /**
@@ -819,10 +821,12 @@ export default class Grammar {
 
     const where = this.compileWheres(query)
 
-    return (!isUndefined(query.joins)
+    const sql = (!isNull(query.joins)
         ? this.compileDeleteWithJoins(query, table, where)
         : this.compileDeleteWithoutJoins(query, table, where)
     ).trim()
+
+    return sql.replace(/"/g, '')
   }
 
   /**
@@ -924,7 +928,7 @@ export default class Grammar {
    * @returns {SourceNode | * | string}
    */
   parameterize (values) {
-    return values.map(value => Grammar.parameter(value)).join(', ')
+    return Object.values(values).map(value => Grammar.parameter(value)).join(', ')
   }
 
   /**

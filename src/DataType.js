@@ -31,7 +31,11 @@ export function isFunction (value) {
  * @returns {*|boolean}
  */
 export function isObject (value) {
-  return value && typeof value === 'object' && value.constructor === Object
+  return (
+    value &&
+    typeof value === 'object' &&
+    value.constructor === Object
+  )
 }
 
 /**
@@ -40,7 +44,10 @@ export function isObject (value) {
  * @returns {boolean}
  */
 export function isNull (value) {
-  return value === null || (Array.isArray(value) && value.length === 0)
+  return (
+    value === null ||
+    (Array.isArray(value) && value.length === 0)
+  )
 }
 
 /**
@@ -67,7 +74,11 @@ export function isBoolean (value) {
  * @returns {*|boolean}
  */
 export function isRegExp (value) {
-  return value && typeof value === 'object' && value.constructor === RegExp
+  return (
+    value &&
+    typeof value === 'object' &&
+    value.constructor === RegExp
+  )
 }
 
 /**
@@ -76,7 +87,10 @@ export function isRegExp (value) {
  * @returns {boolean}
  */
 export function isError (value) {
-  return value instanceof Error && typeof value.message !== 'undefined'
+  return (
+    value instanceof Error &&
+    typeof value.message !== 'undefined'
+  )
 }
 
 /**
