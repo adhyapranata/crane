@@ -8,6 +8,7 @@ import {
   isNull, isUndefined, isNumber
 } from './DataType'
 import {
+  last,
   objectKey,
   objectVal
 } from './Utilities'
@@ -1619,7 +1620,8 @@ export default class Builder {
    *
    * @returns {*}
    */
-  first () {
+  first (columns = ['*']) {
+    this.select(columns)
     return this.connection.first(this.collect())
   }
 
@@ -1854,10 +1856,117 @@ export default class Builder {
         params = [...params, objectVal(statement)]
       })
     } else {
-      sqls = [objectKey(statement)]
-      params = [objectVal(statement)]
+      sqls = [objectKey(statements)]
+      params = [objectVal(statements)]
     }
 
     return this.connection.statement({sqls, params})
+  }
+
+  /**
+   * Execute a query for a single record by ID.
+   *
+   * @param id
+   * @param columns
+   * @return mixed|static
+   */
+  find (id, columns = ['*']) {
+    return this.where('id', '=', id).first(columns)
+  }
+
+  /**
+   * Get a single column's value from the first result of a query.
+   *
+   * @param column
+   * @return mixed
+   */
+  async value (column)
+  {
+    const result = await this.first([column])
+    return result.length > 0 ? result : null
+  }
+
+  /**
+   * Execute the given callback while selecting the given columns.
+   *
+   * After running the callback, the columns are reset to the original value.
+   *
+   * @param columns
+   * @param callback
+   * @return mixed
+   */
+  async onceWithColumns(columns, callback) {
+    let original = this.columns
+
+    if (isNull(original)) {
+      this.columns = columns
+    }
+
+    let result = await callback()
+    this.columns = original
+    return result
+  }
+
+  /**
+   * Get an array with the values of a given column.
+   *
+   * @param column
+   * @param key
+   * @return any
+   */
+  async pluck(column, key = null) {
+    // First, we will need to select the results of the query accounting for the
+    // given columns / key. Once we have the results, we will be able to take
+    // the results and get the exact data that was requested for the query.
+    let queryResult = await this.onceWithColumns(
+      isNull(key) ? [column] : [column, key],
+      () => this.get()
+    )
+
+    if (!isNull(queryResult)) {
+      return queryResult
+    }
+
+    // If the columns are qualified with a table or have an alias, we cannot use
+    // those directly in the "pluck" operations since the results from the DB
+    // are only keyed by the column itself. We'll strip the table out here.
+    column = this.stripTableForPluck(column)
+    key = this.stripTableForPluck(key)
+
+    return this.pluckFromObjectColumn(queryResult, column, key)
+  }
+
+  /**
+   * Strip off the table name or alias from a column identifier.
+   *
+   * @param column
+   * @return string|null
+   */
+  stripTableForPluck (column) {
+    return isNull(column) ? column : last(column.split(/~\.| ~/));
+  }
+
+  /**
+   * Retrieve column values from rows represented as objects.
+   *
+   * @param queryResult
+   * @param column
+   * @param key
+   * @return any
+   */
+  pluckFromObjectColumn (queryResult, column, key) {
+    let results = []
+
+    if (isNull(key)) {
+      queryResult.forEach(row => {
+        results = [...results, row.column]
+      })
+    } else {
+      queryResult.forEach(row => {
+        results[row.key] = row.column
+      })
+    }
+
+    return results
   }
 }
