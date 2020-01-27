@@ -1778,16 +1778,15 @@ export default class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  increment(column, amount = 1, extra = []) {
+  increment(column, amount = 1, extra = {}) {
     if (! isNumber(amount)) {
       throw Error('Non-numeric value passed to increment method.')
     }
     const wrapped = this.grammar.wrap(column)
-    const columns = [
-      {
-        [column]: Builder.raw("$wrapped + $amount")
-      }
-    ].merge(extra)
+    const columns = {
+      [column]: (new Expression(`${wrapped} + ${amount}`)),
+      ...extra
+    }
 
     return this.update(columns)
   }
@@ -1802,18 +1801,17 @@ export default class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  decrement(column, amount = 1, extra = [])
-  {
+  decrement(column, amount = 1, extra = {}) {
     if (! isNumber(amount)) {
       throw new Error('Non-numeric value passed to decrement method.')
     }
 
     const wrapped = this.grammar.wrap(column)
-    const columns = [
-      {
-        [column]: Builder.raw("$wrapped - $amount")
-      }
-    ].merge(extra)
+    const columns = {
+      [column]: (new Expression(`${wrapped} - ${amount}`)),
+      ...extra
+    }
+
     return this.update(columns)
   }
 

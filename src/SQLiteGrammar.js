@@ -106,9 +106,9 @@ export default class SQLiteGrammar extends Grammar {
       (Object.prototype.hasOwnProperty.call(query, 'joins') && query.joins.length) ||
       (Object.prototype.hasOwnProperty.call(query, 'limit') && !isNull(query.limit))
     ) {
-      return this.compileUpdateWithJoinsOrLimit(query, values)
+      return this.compileUpdateWithJoinsOrLimit(query, values).replace(/"/g, '')
     }
-    return super.compileUpdate(query, values)
+    return super.compileUpdate(query, values).replace(/"/g, '')
   }
 
   /**
