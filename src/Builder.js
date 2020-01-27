@@ -1801,7 +1801,8 @@ export default class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  decrement(column, amount = 1, extra = {}) {
+  decrement(column, amount = 1, extra = {})
+  {
     if (! isNumber(amount)) {
       throw new Error('Non-numeric value passed to decrement method.')
     }
@@ -1840,10 +1841,23 @@ export default class Builder {
   /**
    * Run a truncate statement on the table.
    *
-   * @return void
+   * @return Promise
    */
   truncate() {
-    const {sql, bindings} = this.grammar.compileTruncate(this)
-    this.connection.statement(sql, bindings)
+    const statements = this.grammar.compileTruncate(this)
+    let sqls = [],
+      params = [];
+
+    if (Array.isArray(statements)) {
+      statements.forEach((statement) => {
+        sqls = [...sqls, objectKey(statement)]
+        params = [...params, objectVal(statement)]
+      })
+    } else {
+      sqls = [objectKey(statement)]
+      params = [objectVal(statement)]
+    }
+
+    return this.connection.statement({sqls, params})
   }
 }

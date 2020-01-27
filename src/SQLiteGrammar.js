@@ -191,8 +191,8 @@ export default class SQLiteGrammar extends Grammar {
    */
   compileTruncate (query) {
     return [
-      { 'delete from sqlite_sequence where name = ?': [query.from] },
-      { [`delete from ${this.wrapTable(query.from)}`]: [] }
+      {'delete from sqlite_sequence where name = ?': [query.from]},
+      {[`delete from ${this.wrapTable(query.from)}`]: []}
     ]
   }
 

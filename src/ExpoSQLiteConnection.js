@@ -45,6 +45,10 @@ export default class RNSQLiteConnection {
     return this.run(props)
   }
 
+  statement ({sqls, params}) {
+    return this.executeBulkSql(sqls, params)
+  }
+
   /**
    *
    * @param sql
