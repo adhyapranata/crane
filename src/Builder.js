@@ -107,6 +107,40 @@ export default class Builder {
   }
 
   /**
+   * Add a raw where clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @param boolean
+   * @return this
+   */
+  whereRaw (sql, bindings = [], boolean = 'and') {
+    this.wheres = [
+      ...this.wheres,
+      {
+        type: 'raw',
+        sql,
+        boolean
+      }
+    ]
+
+    this.addBinding(bindings, 'where')
+
+    return this
+  }
+
+  /**
+   * Add a raw or where clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @return this
+   */
+  orWhereRaw (sql, bindings = []) {
+    return this.whereRaw(sql, bindings, 'or')
+  }
+
+  /**
    * Add a new select column to the query.
    *
    * @param column
