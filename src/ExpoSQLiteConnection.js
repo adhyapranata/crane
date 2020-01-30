@@ -19,32 +19,68 @@ export default class RNSQLiteConnection {
     return db
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   get (props) {
     const resolve = res => res[0].rows
     return this.run({...props, resolve})
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   insert (props) {
     return this.run(props)
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   processInsertGetId (props) {
     const resolve = res => res[0].insertId
     return this.run({...props, resolve})
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   affectingStatement (props) {
     return this.run(props)
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   update (props) {
     return this.run(props)
   }
 
+  /**
+   *
+   * @param props
+   * @returns {*}
+   */
   delete (props) {
     return this.run(props)
   }
 
+  /**
+   *
+   * @param sqls
+   * @param params
+   * @returns {Promise<unknown>}
+   */
   statement ({sqls, params}) {
     return this.executeBulkSql(sqls, params)
   }

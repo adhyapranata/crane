@@ -8,9 +8,12 @@ import {
   isNull, isUndefined, isNumber
 } from './DataType'
 import {
+  flattenArrayOfObjects,
+  ksort,
   last,
   objectKey,
-  objectVal
+  objectVal,
+  objectToArray,
 } from './Utilities'
 
 const operators = [
@@ -1079,7 +1082,7 @@ export default class Builder {
    * @param  parentQuery
    * @param  type
    * @param  table
-   * @return JoinClause
+   * @return {Builder}
    */
   newJoinClause (parentQuery, type, table) {
     return this.createJoinClause(parentQuery, type, table)
@@ -1129,15 +1132,15 @@ export default class Builder {
 
   /**
    *
-   * @returns {JoinClause}
+   * @returns {Builder}
    */
   newQuery () {
-    return new JoinClause(this.newParentQuery(), this.type, this.table)
+    return this.createJoinClause(this.newParentQuery(), this.type, this.table)
   }
 
   /**
    *
-   * @returns {JoinClause|Builder}
+   * @returns {Builder}
    */
   forSubQuery () {
     return this.newParentQuery().newQuery()
@@ -1681,7 +1684,7 @@ export default class Builder {
     // so there are not any errors or problems when inserting these records.
     else {
       values.forEach((value, key) => {
-        this.ksort(value)
+        ksort(value)
         values[key] = value
       })
     }
@@ -1690,23 +1693,8 @@ export default class Builder {
     // the query so they are all in one huge, flattened array for execution.
     return this.connection.insert({
       sql: this.grammar.compileInsert(this, values),
-      params: this.cleanBindings(this.flattenArrayOfObjects(values))
+      params: this.cleanBindings(flattenArrayOfObjects(values))
     })
-  }
-
-  flattenArrayOfObjects (arr) {
-    return arr.reduce((acc, value) => {
-      return [...acc, ...Object.values(value)]
-    }, [])
-  }
-
-  ksort (unordered) {
-    const ordered = {}
-    Object.keys(unordered).sort().forEach(key => {
-      ordered[key] = unordered[key]
-    })
-
-    return unordered
   }
 
   /**
@@ -1724,14 +1712,14 @@ export default class Builder {
       values = [values]
     } else {
       values.forEach((value, key) => {
-        this.ksort(value)
+        ksort(value)
         values[key] = value
       })
     }
 
     return this.connection.affectingStatement({
       sql: this.grammar.compileInsertOrIgnore(this, values),
-      params: this.cleanBindings(this.flattenArrayOfObjects(values))
+      params: this.cleanBindings(flattenArrayOfObjects(values))
     });
   }
 
@@ -1786,8 +1774,8 @@ export default class Builder {
    * @param  values
    * @return boolean
    */
-  async updateOrInsert(attributes, values = {}) {
-    if (! await this.where(...this.objectToArray(attributes)).exists()) {
+  async updateOrInsert (attributes, values = {}) {
+    if (! await this.where(...objectToArray(attributes)).exists()) {
       return this.insert({...attributes, ...values})
     }
 
@@ -1796,12 +1784,6 @@ export default class Builder {
     }
 
     return !! this.take(1).update(values)
-  }
-
-  objectToArray(obj) {
-    return Object.keys(obj).map(key => {
-      return [key, obj[key]]
-    }).flat()
   }
 
   /**
@@ -1814,7 +1796,7 @@ export default class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  increment(column, amount = 1, extra = {}) {
+  increment (column, amount = 1, extra = {}) {
     if (! isNumber(amount)) {
       throw Error('Non-numeric value passed to increment method.')
     }
@@ -1837,8 +1819,7 @@ export default class Builder {
    *
    * @throws \InvalidArgumentException
    */
-  decrement(column, amount = 1, extra = {})
-  {
+  decrement (column, amount = 1, extra = {}) {
     if (! isNumber(amount)) {
       throw new Error('Non-numeric value passed to decrement method.')
     }
@@ -1858,7 +1839,7 @@ export default class Builder {
    * @param id
    * @return int
    */
-  delete(id = null) {
+  delete (id = null) {
     // If an ID is passed to the method, we will set the where clause to check the
     // ID to let developers to simply and quickly remove a single row from this
     // database without manually specifying the "where" clauses on the query.
@@ -1879,7 +1860,7 @@ export default class Builder {
    *
    * @return Promise
    */
-  truncate() {
+  truncate () {
     const statements = this.grammar.compileTruncate(this)
     let sqls = [],
       params = [];
@@ -1914,8 +1895,7 @@ export default class Builder {
    * @param column
    * @return mixed
    */
-  async value (column)
-  {
+  async value (column) {
     const result = await this.first([column])
     return result.length > 0 ? result : null
   }
@@ -1929,7 +1909,7 @@ export default class Builder {
    * @param callback
    * @return mixed
    */
-  async onceWithColumns(columns, callback) {
+  async onceWithColumns (columns, callback) {
     let original = this.columns
 
     if (isNull(original)) {
@@ -1948,7 +1928,7 @@ export default class Builder {
    * @param key
    * @return any
    */
-  async pluck(column, key = null) {
+  async pluck (column, key = null) {
     // First, we will need to select the results of the query accounting for the
     // given columns / key. Once we have the results, we will be able to take
     // the results and get the exact data that was requested for the query.

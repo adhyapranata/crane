@@ -1,8 +1,8 @@
 {
-  "name": "react-native-query-builder",
+  "name": "crane",
   "version": "0.1.0",
   "main": "index.js",
-  "repository": "git@github.com:adhyapranata/react-native-query-builder.git",
+  "repository": "git@github.com:adhyapranata/crane.git",
   "author": "Adhya Pranata <adhyapranata@gmail.com>",
   "license": "MIT",
   "keywords": [
