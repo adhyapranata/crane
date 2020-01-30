@@ -1,4 +1,4 @@
-# React Native Query Builder
+# Crane: A React Native Query Builder
 
 The section after the title is where we say what this library, sample, or SDK does in a few sentences. Consider adding:
 
@@ -41,7 +41,7 @@ Make sure this is updated based on the sections included:
 - [Support + Feedback](#support--feedback)
 - [Vulnerability Reporting](#vulnerability-reporting)
 - [Thank You](#thank-you)
-- [What is React Native Query Builder](#what-is-auth0)
+- [What is Crane](#what-is-auth0)
 - [License](#license)
 
 ## Documentation
@@ -54,7 +54,7 @@ Consider adding:
 - Links to Quickstarts and sample projects
 - Links to any specific `.md` files in the repo
 - Links to [auth0/docs](https://auth0.com/docs/)
-- Links to [React Native Query Builder blog posts](https://auth0.com/blog/tech/)
+- Links to [Crane blog posts](https://auth0.com/blog/tech/)
 - Links to any helpful supporting information about the project
 - Links to relevant Community posts (consider parsing and adding somewhere more easily accessible)
 
@@ -100,8 +100,8 @@ Consider adding:
 
 We appreciate feedback and contribution to this repo! Before you get started, please see the following:
 
-- [React Native Query Builder's general contribution guidelines](https://github.com/auth0/open-source-template/blob/master/GENERAL-CONTRIBUTING.md)
-- [React Native Query Builder's code of conduct guidelines](https://github.com/auth0/open-source-template/blob/master/CODE-OF-CONDUCT.md)
+- [Crane's general contribution guidelines](https://github.com/auth0/open-source-template/blob/master/GENERAL-CONTRIBUTING.md)
+- [Crane's code of conduct guidelines](https://github.com/auth0/open-source-template/blob/master/CODE-OF-CONDUCT.md)
 - [This repo's contribution guide](CONTRIBUTING.md)
 
 ## Support + Feedback
@@ -116,9 +116,9 @@ Include information on how to get support. Consider adding:
 
 Please do not report security vulnerabilities on the public GitHub issue tracker. The [Responsible Disclosure Program](https://auth0.com/whitehat) details the procedure for disclosing security issues.
 
-## What is React Native Query Builder?
+## What is Crane?
 
-React Native Query Builder helps you to easily:
+Crane helps you to easily:
 
 - implement authentication with multiple identity providers, including social (e.g., Google, Facebook, Microsoft, LinkedIn, GitHub, Twitter, etc), or enterprise (e.g., Windows Azure AD, Google Apps, Active Directory, ADFS, SAML, etc.)
 - log in users with username/password databases, passwordless, or multi-factor authentication
@@ -127,7 +127,7 @@ React Native Query Builder helps you to easily:
 - access demographics and analytics detailing how, when, and where users are logging in
 - enrich user profiles from other data sources using customizable JavaScript rules
 
-[Why React Native Query Builder?](https://auth0.com/why-auth0)
+[Why Crane?](https://auth0.com/why-auth0)
 
 ## Thank You! (optional)
 
