@@ -1,7 +1,8 @@
 # Crane: A React Native Query Builder
 
-Crane is a query builder for react native and expo extracted from Laravel's [illuminate/database](https://github.com/illuminate/database).
-This library supports both [react-native-sqlite-storage](https://github.com/andpor/react-native-sqlite-storage) and [expo sqlite](https://docs.expo.io/versions/latest/sdk/sqlite/). This project is actively maintained. 
+Crane is a query builder for React Native extracted from Laravel's [illuminate/database](https://github.com/illuminate/database).
+This library supports both [react-native-sqlite-storage](https://github.com/andpor/react-native-sqlite-storage) and [expo sqlite](https://docs.expo.io/versions/latest/sdk/sqlite/).
+For a quick start, please try [this sandbox](https://github.com/adhyapranata/crane-expo-sandbox).  
 
 [![Code Climate](https://img.shields.io/codeclimate/maintainability/adhyapranata/crane.svg)](https://codeclimate.com/github/adhyapranata/crane)
 [![License](http://img.shields.io/:license-mit-blue.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -65,7 +66,6 @@ export async function makeSQLiteDirAsync() {
 
   try {
     await dbTest.transaction(tx => tx.executeSql(''));
-
     loadDB();
   } catch (e) {
     if (this.state.debugEnabled)
@@ -81,10 +81,6 @@ export async function loadDB() {
       Asset.fromModule(require('./assets/db/db.db')).uri,
       `${FileSystem.documentDirectory}SQLite/db.db`
     );
-
-    dbFile = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}SQLite/db.db`);
-
-    console.log(dbFile);
   }
 
   DB.addConnection({
@@ -93,10 +89,10 @@ export async function loadDB() {
     name: 'db.db',
   });
 
-  testDatabase();
+  getAlbums();
 }
 
-export async function testDatabase() {
+export async function getAlbums() {
   let albums = await Builder()
       .table('albums')
       .where('ArtistId', '>', 200)
@@ -804,7 +800,7 @@ await Builder()
 
 ## Contributing
 
-> Crane is platform agnostic which means it can be used for web app and extended for other drivers like PostgreSQL or MySQL by adding Grammar and Connection.
+> Crane is platform-agnostic, which means it can be used for a web app, and it can be extended for other drivers like PostgreSQL or MySQL by adding Grammar and Connection.
 
 We appreciate feedback and contribution to this repo! Before you get started, please see the following:
 
@@ -818,7 +814,7 @@ We appreciate feedback and contribution to this repo! Before you get started, pl
 
 ## Thank You!
 
-- [Laravel](https://laravel.com/docs/6.x/queries) as the main reference of this library
+- [Laravel](https://laravel.com/docs/6.x/queries) as the primary reference of this library
 
 ## License
 
