@@ -41,7 +41,7 @@ yarn add git+https://git@github.com:adhyapranata/crane.git#0.1.0
 ### For Expo
 ```javascript
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Builder, { DB } from 'crane';
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
@@ -96,11 +96,13 @@ export async function loadDB() {
   testDatabase();
 }
 
-export function testDatabase() {
+export async function testDatabase() {
   let albums = await Builder()
       .table('albums')
       .where('ArtistId', '>', 200)
-      .get()
+      .get();
+
+  console.log(albums);
 }
 ```
 
@@ -124,6 +126,7 @@ export function testDatabase() {
 
 ### Retrieving Results
 **Retrieving All Rows From A Table**
+
 You may use the `table` method begin a query. The table method returns a fluent query builder instance for the given table, allowing you to chain more constraints onto the query and then finally get the results using the get method:
 ```javascript
 let albums = await Builder()
@@ -157,6 +160,7 @@ let users = await Builder()
 ```
 
 **Retrieving A List Of Column Values**
+
 If you would like to retrieve a Collection containing the values of a single column, you may use the `pluck` method. In this example, we'll retrieve a Collection of role titles:
 ```javascript
 let employees = await Builder()
@@ -186,6 +190,7 @@ let invoices = await Builder()
 ```
 
 **Determining If Records Exist**
+
 Instead of using the `count` method to determine if any records exist that match your query's constraints, you may use the `exists` and `doesntExist` methods:
 ```javascript
 let customersA = await Builder()
@@ -201,6 +206,7 @@ let customersB = await Builder()
 
 ### Selects
 **Specifying A Select Clause**
+
 You may not always want to select all columns from a database table. Using the `select` method, you can specify a custom `select` clause for the query:
 ```javascript
 let customers = await Builder()
@@ -244,6 +250,7 @@ let users = await Builder().table('users')
 Instead of using `raw`, you may also use the following methods to insert a raw expression into various parts of your query.
 
 `selectRaw`
+
 The selectRaw method can be used in place of `addSelect(Builder().raw(...))`. This method accepts an optional array of bindings as its second argument:
 ```javascript
 let orders = await Builder()
@@ -253,6 +260,7 @@ let orders = await Builder()
 ````
 
 `whereRaw / orWhereRaw`
+
 The `whereRaw` and `orWhereRaw` methods can be used to inject a raw where clause into your query. These methods accept an optional array of bindings as their second argument:
 ```javascript
 let orders = await Builder()
@@ -262,6 +270,7 @@ let orders = await Builder()
 ````
 
 `havingRaw / orHavingRaw`
+
 The `havingRaw` and `orHavingRaw` methods may be used to set a raw string as the value of the `having` clause. These methods accept an optional array of bindings as their second argument:
 ```javascript
 let orders = await Builder()
@@ -273,6 +282,7 @@ let orders = await Builder()
 ````
 
 `orderByRaw`
+
 The `orderByRaw` method may be used to set a raw string as the value of the `order by` clause:
 ```javascript
 let orders = await Builder()
@@ -283,6 +293,7 @@ let orders = await Builder()
 
 ### Joins
 **Inner Join Clause**
+
 The query builder may also be used to write join statements. To perform a basic "inner join", you may use the `join` method on a query builder instance. The first argument passed to the `join` method is the name of the table you need to join to, while the remaining arguments specify the column constraints for the join. You can even join to multiple tables in a single query:
 ```javascript
 let users = await Builder()
@@ -294,6 +305,7 @@ let users = await Builder()
 ```
 
 **Left Join / Right Join Clause**
+
 If you would like to perform a "left join" or "right join" instead of an "inner join", use the `leftJoin` or `rightJoin` methods. These methods have the same signature as the `join` method:
 ```javascript
 let usersA = await Builder()
@@ -308,6 +320,7 @@ let usersB = await Builder()
 ```
 
 **Cross Join Clause**
+
 To perform a "cross join" use the `crossJoin` method with the name of the table you wish to cross join to. Cross joins generate a cartesian product between the first table and the joined table:
 ```javascript
 let users = await Builder()
@@ -317,6 +330,7 @@ let users = await Builder()
 ```
 
 **Advanced Join Clauses**
+
 You may also specify more advanced join clauses. To get started, pass a `Closure` as the second argument into the `join` method. The `Closure` will receive a `JoinClause` object which allows you to specify constraints on the `join` clause:
 ```javascript
 await Builder()
@@ -341,6 +355,7 @@ await Builder()
 ```
 
 **Subquery Joins**
+
 You may use the `joinSub`, `leftJoinSub`, and `rightJoinSub` methods to join a query to a subquery. Each of these methods receive three arguments: the subquery, its table alias, and a Closure that defines the related columns:
 ```javascript
 await Builder()
@@ -371,6 +386,7 @@ let users = await Builder()
 
 ### Where Clauses
 **Simple Where Clauses**
+
 You may use the `where` method on a query builder instance to add `where` clauses to the query. The most basic call to `where` requires three arguments. The first argument is the name of the column. The second argument is an operator, which can be any of the database's supported operators. Finally, the third argument is the value to evaluate against the column.
 
 For example, here is a query that verifies the value of the "votes" column is equal to 100:
@@ -416,6 +432,7 @@ let users = await Builder()
 ```
 
 **Or Statements**
+
 You may chain where constraints together as well as add or clauses to the query. The `orWhere` method accepts the same arguments as the `where` method:
 ```javascript
 let users = await Builder()
@@ -694,6 +711,7 @@ let users = await Builder()
 ```
 
 **Auto-Incrementing IDs**
+
 If the table has an auto-incrementing id, use the `insertGetId` method to insert a record and then retrieve the ID:
 ```javascript
 let users = await Builder() 
@@ -717,6 +735,7 @@ let artists = await Builder()
 ```
 
 **Update Or Insert**
+
 Sometimes you may want to update an existing record in the database or create it if no matching record exists. In this scenario, the `updateOrInsert` method may be used. The `updateOrInsert` method accepts two arguments: an array of conditions by which to find the record, and an array of column and value pairs containing the columns to be updated.
 
 The `updateOrInsert` method will first attempt to locate a matching database record using the first argument's column and value pairs. If the record exists, it will be updated with the values in the second argument. If the record can not be found, a new record will be inserted with the merged attributes of both arguments:
@@ -785,7 +804,7 @@ await Builder()
 
 ## Contributing
 
-> Crane is platform agnostic which means it can be used for web app and extended for other driver like PostgreSQL or MySQL by adding Grammar and Connection.
+> Crane is platform agnostic which means it can be used for web app and extended for other drivers like PostgreSQL or MySQL by adding Grammar and Connection.
 
 We appreciate feedback and contribution to this repo! Before you get started, please see the following:
 
