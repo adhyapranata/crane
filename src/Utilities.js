@@ -101,3 +101,39 @@ export function objectVal (obj) {
 export function upperCaseFirstLetter (str) {
   return `${str.charAt(0).toUpperCase()}${str.slice(1)}`
 }
+
+/**
+ *
+ * @param obj
+ * @returns {*[]}
+ */
+export function objectToArray (obj) {
+  return Object.keys(obj).map(key => {
+    return [key, obj[key]]
+  }).flat()
+}
+
+/**
+ *
+ * @param arr
+ * @returns {*}
+ */
+export function flattenArrayOfObjects (arr) {
+  return arr.reduce((acc, value) => {
+    return [...acc, ...Object.values(value)]
+  }, [])
+}
+
+/**
+ *
+ * @param unordered
+ * @returns {*}
+ */
+export function ksort (unordered) {
+  const ordered = {}
+  Object.keys(unordered).sort().forEach(key => {
+    ordered[key] = unordered[key]
+  })
+
+  return unordered
+}

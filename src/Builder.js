@@ -5,11 +5,15 @@ import {
   isBoolean,
   isObject,
   isFunction,
-  isNull
+  isNull, isUndefined, isNumber
 } from './DataType'
 import {
+  flattenArrayOfObjects,
+  ksort,
+  last,
   objectKey,
-  objectVal
+  objectVal,
+  objectToArray,
 } from './Utilities'
 
 const operators = [
@@ -36,7 +40,7 @@ export default class Builder {
     this.columns = []
     this.isDistinct = false
     this.from = null
-    this.joins = null
+    this.joins = []
     this.wheres = []
     this.groups = null
     this.havings = null
@@ -103,6 +107,40 @@ export default class Builder {
     }
 
     return this
+  }
+
+  /**
+   * Add a raw where clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @param boolean
+   * @return this
+   */
+  whereRaw (sql, bindings = [], boolean = 'and') {
+    this.wheres = [
+      ...this.wheres,
+      {
+        type: 'raw',
+        sql,
+        boolean
+      }
+    ]
+
+    this.addBinding(bindings, 'where')
+
+    return this
+  }
+
+  /**
+   * Add a raw or where clause to the query.
+   *
+   * @param sql
+   * @param bindings
+   * @return this
+   */
+  orWhereRaw (sql, bindings = []) {
+    return this.whereRaw(sql, bindings, 'or')
   }
 
   /**
@@ -873,6 +911,252 @@ export default class Builder {
   }
 
   /**
+   * Add a join clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @param  where
+   * @return {Builder}
+   */
+  join (table, first, operator = null, second = null, type = 'inner', where = false) {
+    const join = this.newJoinClause(this, type, table)
+
+    if (isFunction(first)) {
+      first(join)
+
+      this.joins = [...this.joins, join]
+
+      this.addBinding(join.getBindings(), 'join')
+    } else {
+      const method = where ? 'where' : 'on'
+
+      this.joins = [...this.joins, join[method](first, operator, second)]
+
+      this.addBinding(join.getBindings(), 'join');
+    }
+
+    return this;
+  }
+
+  /**
+   * Add a "join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @return {Builder}
+   */
+  joinWhere (table, first, operator, second, type = 'inner') {
+    return this.join(table, first, operator, second, type, true)
+  }
+
+  /**
+   * Add a subquery join clause to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @param  type
+   * @param  where
+   * @return {Builder}
+   */
+  joinSub (query, as, first, operator = null, second = null, type = 'inner', where = false) {
+    const { checkedQuery, bindings } = Builder.createSub(query)
+
+    const expression = `(${checkedQuery}) as ${this.grammar.wrapTable(as)}`
+
+    this.addBinding(bindings, 'join')
+
+    return this.join(new Expression(expression), first, operator, second, type, where)
+  }
+
+  /**
+   * Add a left join to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoin (table, first, operator = null, second = null) {
+    return this.join(table, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a "join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoinWhere (table, first, operator, second) {
+    return this.joinWhere(table, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a subquery left join to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  leftJoinSub (query, as, first, operator = null, second = null) {
+    return this.joinSub(query, as, first, operator, second, 'left')
+  }
+
+  /**
+   * Add a right join to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoin (table, first, operator = null, second = null) {
+    return this.join(table, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a "right join where" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoinWhere (table, first, operator, second) {
+    return this.joinWhere(table, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a subquery right join to the query.
+   *
+   * @param  query
+   * @param  as
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  rightJoinSub (query, as, first, operator = null, second = null) {
+    return this.joinSub(query, as, first, operator, second, 'right')
+  }
+
+  /**
+   * Add a "cross join" clause to the query.
+   *
+   * @param  table
+   * @param  first
+   * @param  operator
+   * @param  second
+   * @return {Builder}
+   */
+  crossJoin (table, first = null, operator = null, second = null) {
+    if (first) {
+      return this.join(table, first, operator, second, 'cross')
+    }
+
+    this.joins = [...this.joins, this.newJoinClause(this, 'cross', table)]
+
+    return this
+  }
+
+  /**
+   * Get a new join clause.
+   *
+   * @param  parentQuery
+   * @param  type
+   * @param  table
+   * @return {Builder}
+   */
+  newJoinClause (parentQuery, type, table) {
+    return this.createJoinClause(parentQuery, type, table)
+  }
+
+  /**
+   *
+   * @param parentQuery
+   * @param type
+   * @param table
+   */
+  createJoinClause (parentQuery, type, table) {
+    const builder = new Builder()
+    builder.clause = 'join'
+    builder.type = type
+    builder.table = table
+    builder.parentClass = parentQuery.constructor.name
+    return builder
+  }
+
+  /**
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @param boolean
+   * @returns {Builder|*}
+   */
+  on (first, operator = null, second = null, boolean = 'and') {
+    if (isFunction(first)) {
+      return this.whereNested(first, boolean)
+    }
+
+    return this.whereColumn(first, operator, second, boolean)
+  }
+
+  /**
+   *
+   * @param first
+   * @param operator
+   * @param second
+   * @returns {Builder|*}
+   */
+  orOn (first, operator = null, second = null) {
+    return this.on(first, operator, second, 'or')
+  }
+
+  /**
+   *
+   * @returns {Builder}
+   */
+  newQuery () {
+    return this.createJoinClause(this.newParentQuery(), this.type, this.table)
+  }
+
+  /**
+   *
+   * @returns {Builder}
+   */
+  forSubQuery () {
+    return this.newParentQuery().newQuery()
+  }
+
+  /**
+   *
+   * @returns {*}
+   */
+  newParentQuery () {
+    const ParentQuery = this.parentClass
+
+    return new ParentQuery()
+  }
+
+  /**
    * Add a union statement to the query.
    *
    * @param query
@@ -883,6 +1167,8 @@ export default class Builder {
     if (isFunction(query)) {
       query(Builder.newQuery())
     }
+
+    this.unions = isNull(this.unions) ? [] : this.unions
 
     this.unions = [...this.unions, { query, all }]
 
@@ -900,6 +1186,189 @@ export default class Builder {
   unionAll (query) {
     return this.union(query, true)
   }
+
+  /**
+   * Determine if any rows exist for the current query.
+   *
+   * @return boolean
+   */
+  async exists () {
+    let results = await this.connection.get({
+      sql: this.grammar.compileExists(this),
+      params: this.getBindings()
+    })
+
+    // If the results has rows, we will get the row and see if the exists column is a
+    // boolean true. If there is no results for this query we will return false as
+    // there are no rows for this query at all and we can return that info here.
+    if (!isUndefined(results[0])) {
+      results = results[0]
+      return !!results['exists']
+    }
+
+    return false
+  }
+
+  /**
+   * Determine if no rows exist for the current query.
+   *
+   * @return boolean
+   */
+  async doesntExist () {
+    return ! await this.exists()
+  }
+
+  /**
+   * Execute the given callback if no rows exist for the current query.
+   *
+   * @param  callback
+   * @return mixed
+   */
+  async existsOr (callback) {
+    return await this.exists() ? true : callback()
+  }
+
+  /**
+   * Execute the given callback if rows exist for the current query.
+   *
+   * @param callback
+   * @return mixed
+   */
+  async doesntExistOr(callback) {
+    return await this.doesntExist() ? true : callback()
+  }
+
+  /**
+   * Retrieve the "count" result of the query.
+   *
+   * @param columns
+   * @return mixed
+   */
+  count (columns = '*') {
+    return this.startAggregate('count', Builder.wrap(columns))
+  }
+
+  /**
+   * Retrieve the minimum value of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  min (column) {
+    return this.startAggregate('min', [column])
+  }
+
+  /**
+   * Retrieve the maximum value of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  max (column) {
+    return this.startAggregate('max', [column])
+  }
+
+  /**
+   * Retrieve the sum of the values of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  async sum (column) {
+    const result = await this.startAggregate('sum', [column])
+    return result ? result : 0
+  }
+
+  /**
+   * Retrieve the average of the values of a given column.
+   *
+   * @param column
+   * @return mixed
+   */
+  avg (column) {
+    return this.startAggregate('avg', [column])
+  }
+
+  /**
+   * Alias for the "avg" method.
+   *
+   * @param column
+   * @return mixed
+   */
+
+  average (column) {
+    return this.avg(column)
+  }
+
+  /**
+   * Execute an aggregate function on the database.
+   *
+   * @param functionName
+   * @param columns
+   * @return mixed
+   */
+  async startAggregate(functionName, columns = ['*']) {
+    let results = this.cloneWithout(this.unions ? [] : ['columns'])
+      .cloneWithoutBindings(this.unions ? [] : ['select'])
+      .setAggregate(functionName, columns)
+
+    results = await results.get()
+
+    if (!isNull(results)) {
+      return results[0]['aggregate']
+    }
+  }
+
+  /**
+   * Set the aggregate property without running the query.
+   *
+   * @param functionName
+   * @param columns
+   * @return this
+   */
+  setAggregate(functionName, columns) {
+    this.aggregate = {functionName, columns}
+
+    if (isNull(this.groups)) {
+      this.orders = null
+      this.bindings['order'] = []
+    }
+
+    return this
+  }
+
+  /**
+   * Clone the query without the given properties.
+   *
+   * @param properties
+   * @return static
+   */
+  cloneWithout (properties) {
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+
+    properties.forEach(property => {
+      clone[property] = null
+    })
+
+    return clone
+  }
+
+  /**
+   * Clone the query without the given bindings.
+   *
+   * @param except
+   * @return static
+   */
+  cloneWithoutBindings (except) {
+    const clone = Object.assign(Object.create(Object.getPrototypeOf(this)), this);
+
+    except.forEach(type => {
+      clone.bindings[type] = []
+    })
+
+    return clone
+  }
+
 
   /**
    * Create a raw database expression.
@@ -1188,185 +1657,330 @@ export default class Builder {
    *
    * @returns {*}
    */
-  first () {
+  first (columns = ['*']) {
+    this.select(columns)
     return this.connection.first(this.collect())
   }
 
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // assembleSql () {
-  //   const select = this.compileSelect()
-  //   const from = this.compileFrom()
-  //   const where = this.compileWhere()
-  //   const groupBy = this.compileGroupBy()
-  //   const orderBy = this.compileOrderBy()
-  //   const having = this.compileHaving()
-  //   const offset = this.compileOffset()
-  //   const limit = this.compileLimit()
-  //
-  //   return `${select} ${from} ${where} ${groupBy} ${orderBy} ${having} ${offset} ${limit}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileSelect () {
-  //   const prefix = !this.isDistinct ? 'select' : 'select distinct'
-  //
-  //   return !this.columns.length
-  //     ? `${prefix} *`
-  //     : `${prefix} ${this.columns.join(', ')}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileFrom () {
-  //   const prefix = 'from'
-  //
-  //   return `${prefix} ${this.from}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileWhere () {
-  //   let prefix = 'where'
-  //   let placeholder = null
-  //
-  //   return !this.wheres.length
-  //     ? ''
-  //     : this.wheres.map((where, index) => {
-  //       prefix = index ? ` ${where.boolean}` : prefix
-  //       placeholder = this.getPlaceholder(where.type, where.values)
-  //
-  //       switch (where.type) {
-  //         case 'NotNull': return `${prefix} ${where.column} is not null`
-  //         case 'Null': return `${prefix} ${where.column} is null`
-  //         case 'Nested': return where.query.compileWhere()
-  //         case 'NotBetween': return `${prefix} ${where.column} not between ${placeholder} and ${placeholder}`
-  //         case 'Between': return `${prefix} ${where.column} between ${placeholder} and ${placeholder}`
-  //         case 'NotIn': return `${prefix} ${where.column} not in (${placeholder})`
-  //         case 'In': return `${prefix} ${where.column} in (${placeholder})`
-  //         case 'Date': return this.grammar.whereDate(this, where)
-  //         case 'Day': return this.grammar.whereDay(this, where)
-  //         case 'Month': return this.grammar.whereMonth(this, where)
-  //         case 'Year': return this.grammar.whereYear(this, where)
-  //         case 'Time': return this.grammar.whereTime(this, where)
-  //         case 'Column': return `${prefix} ${where.first} ${where.operator} ${where.second}`
-  //
-  //         default: return `${prefix} ${where.column} ${where.operator} ?`
-  //       }
-  //     }).join('')
-  // }
-  //
-  // /**
-  //  *
-  //  * @param type
-  //  * @param values
-  //  * @returns {*|SourceNode|string|string}
-  //  */
-  // getPlaceholder (type, values) {
-  //   if (type === 'NotIn' || type === 'In') {
-  //     return values.map(() => '?').join(', ')
-  //   }
-  //
-  //   return '?'
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileGroupBy () {
-  //   if (!this.groups.length) return ''
-  //   const prefix = 'group by'
-  //
-  //   return `${prefix} ${this.groups.join(', ')}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileOrderBy () {
-  //   if (!this.orders.length) return ''
-  //   const prefix = 'order by'
-  //
-  //   return `${prefix} ${this.orders.map(order => `${order.column} ${order.direction}`).join(', ')}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {*}
-  //  */
-  // compileHaving () {
-  //   // If the having clause is "raw", we can just return the clause straight away
-  //   // without doing any more processing on it. Otherwise, we will compile the
-  //   // clause into SQL based on the components that make it up from builder.
-  //   return !this.havings.length
-  //     ? ''
-  //     : this.havings.map(having => {
-  //       if (having.type === 'Raw') {
-  //         return `${having.boolean} ${having.sql}`
-  //       } else if (having.type === 'between') {
-  //         return this.compileHavingBetween(having)
-  //       }
-  //
-  //       return this.compileBasicHaving(having)
-  //     }).join(' ')
-  // }
-  //
-  // /**
-  //  *
-  //  * @param having
-  //  * @returns {string}
-  //  */
-  // compileBasicHaving (having) {
-  //   const column = this.grammar.wrap(having.column)
-  //
-  //   const parameter = Grammar.parameter(having.value)
-  //
-  //   return `${having.boolean} ${column} ${having.operator} ${parameter}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @param having
-  //  * @returns {string}
-  //  */
-  // compileHavingBetween (having) {
-  //   const between = having.not ? 'not between' : 'between'
-  //
-  //   const column = this.grammar.wrap(having.column)
-  //
-  //   const min = Grammar.parameter(having.values[0])
-  //
-  //   const max = Grammar.parameter(having.values[having.values.length - 1])
-  //
-  //   return `${having.boolean} ${column} ${between} ${min} and ${max}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileOffset () {
-  //   if (this.offset) return ''
-  //   return `offset ${isString(this.offset) ? parseInt(this.offset) : this.offset}`
-  // }
-  //
-  // /**
-  //  *
-  //  * @returns {string}
-  //  */
-  // compileLimit () {
-  //   if (this.limit) return ''
-  //   return `limit ${isString(this.limit) ? parseInt(this.limit) : this.limit}`
-  // }
+  /**
+   * Insert a new record into the database.
+   *
+   * @param values
+   * @return boolean
+   */
+  insert (values) {
+    // Since every insert gets treated like a batch insert, we will make sure the
+    // bindings are structured in a way that is convenient when building these
+    // inserts statements by verifying these elements are actually an array.
+    if (isNull(values)) {
+      return true
+    }
+
+    if (! Array.isArray(values)) {
+      values = [values]
+    }
+    // Here, we will sort the insert keys for every record so that each insert is
+    // in the same order for the record. We need to make sure this is the case
+    // so there are not any errors or problems when inserting these records.
+    else {
+      values.forEach((value, key) => {
+        ksort(value)
+        values[key] = value
+      })
+    }
+    // Finally, we will run this query against the database connection and return
+    // the results. We will need to also flatten these bindings before running
+    // the query so they are all in one huge, flattened array for execution.
+    return this.connection.insert({
+      sql: this.grammar.compileInsert(this, values),
+      params: this.cleanBindings(flattenArrayOfObjects(values))
+    })
+  }
+
+  /**
+   * Insert a new record into the database while ignoring errors.
+   *
+   * @param values
+   * @return int
+   */
+  insertOrIgnore (values) {
+    if (isNull(values)) {
+      return 0
+    }
+
+    if (! Array.isArray(values)) {
+      values = [values]
+    } else {
+      values.forEach((value, key) => {
+        ksort(value)
+        values[key] = value
+      })
+    }
+
+    return this.connection.affectingStatement({
+      sql: this.grammar.compileInsertOrIgnore(this, values),
+      params: this.cleanBindings(flattenArrayOfObjects(values))
+    });
+  }
+
+  /**
+   * Insert a new record and get the value of the primary key.
+   *
+   * @param values
+   * @param sequence
+   * @return int
+   */
+  insertGetId (values, sequence = null) {
+    const sql = this.grammar.compileInsertGetId(this, values, sequence)
+    values = this.cleanBindings(Object.values(values))
+    return this.connection.processInsertGetId({sql, params: values, sequence})
+  }
+
+  /**
+   * Insert new records into the table using a subquery.
+   *
+   * @param  columns
+   * @param  query
+   * @return int
+   */
+  insertUsing (columns, query) {
+    const { sql, bindings } = this.createSub(query)
+    return this.connection.affectingStatement(
+      this.grammar.compileInsertUsing(this, columns, sql),
+      this.cleanBindings(bindings)
+    )
+  }
+
+  /**
+   * Update a record in the database.
+   *
+   * @param  values
+   * @return int
+   */
+  update (values) {
+    const sql = this.grammar.compileUpdate(this, values)
+    return this.connection.update({
+      sql,
+      params: this.cleanBindings(
+        this.grammar.prepareBindingsForUpdate(this.bindings, values)
+      )
+    })
+  }
+
+  /**
+   * Insert or update a record matching the attributes, and fill it with values.
+   *
+   * @param  attributes
+   * @param  values
+   * @return boolean
+   */
+  async updateOrInsert (attributes, values = {}) {
+    if (! await this.where(...objectToArray(attributes)).exists()) {
+      return this.insert({...attributes, ...values})
+    }
+
+    if (isNull(values)) {
+      return true
+    }
+
+    return !! this.take(1).update(values)
+  }
+
+  /**
+   * Increment a column's value by a given amount.
+   *
+   * @param  column
+   * @param  amount
+   * @param  extra
+   * @return int
+   *
+   * @throws \InvalidArgumentException
+   */
+  increment (column, amount = 1, extra = {}) {
+    if (! isNumber(amount)) {
+      throw Error('Non-numeric value passed to increment method.')
+    }
+    const wrapped = this.grammar.wrap(column)
+    const columns = {
+      [column]: (new Expression(`${wrapped} + ${amount}`)),
+      ...extra
+    }
+
+    return this.update(columns)
+  }
+
+  /**
+   * Decrement a column's value by a given amount.
+   *
+   * @param  column
+   * @param  amount
+   * @param  extra
+   * @return int
+   *
+   * @throws \InvalidArgumentException
+   */
+  decrement (column, amount = 1, extra = {}) {
+    if (! isNumber(amount)) {
+      throw new Error('Non-numeric value passed to decrement method.')
+    }
+
+    const wrapped = this.grammar.wrap(column)
+    const columns = {
+      [column]: (new Expression(`${wrapped} - ${amount}`)),
+      ...extra
+    }
+
+    return this.update(columns)
+  }
+
+  /**
+   * Delete a record from the database.
+   *
+   * @param id
+   * @return int
+   */
+  delete (id = null) {
+    // If an ID is passed to the method, we will set the where clause to check the
+    // ID to let developers to simply and quickly remove a single row from this
+    // database without manually specifying the "where" clauses on the query.
+    if (! isNull(id)) {
+      this.where(`${this.from}.id`, '=', id)
+    }
+
+    return this.connection.delete({
+      sql: this.grammar.compileDelete(this),
+      params: this.cleanBindings(
+        this.grammar.prepareBindingsForDelete(this.bindings)
+      )
+    })
+  }
+
+  /**
+   * Run a truncate statement on the table.
+   *
+   * @return Promise
+   */
+  truncate () {
+    const statements = this.grammar.compileTruncate(this)
+    let sqls = [],
+      params = [];
+
+    if (Array.isArray(statements)) {
+      statements.forEach((statement) => {
+        sqls = [...sqls, objectKey(statement)]
+        params = [...params, objectVal(statement)]
+      })
+    } else {
+      sqls = [objectKey(statements)]
+      params = [objectVal(statements)]
+    }
+
+    return this.connection.statement({sqls, params})
+  }
+
+  /**
+   * Execute a query for a single record by ID.
+   *
+   * @param id
+   * @param columns
+   * @return mixed|static
+   */
+  find (id, columns = ['*']) {
+    return this.where('id', '=', id).first(columns)
+  }
+
+  /**
+   * Get a single column's value from the first result of a query.
+   *
+   * @param column
+   * @return mixed
+   */
+  async value (column) {
+    const result = await this.first([column])
+    return result.length > 0 ? result : null
+  }
+
+  /**
+   * Execute the given callback while selecting the given columns.
+   *
+   * After running the callback, the columns are reset to the original value.
+   *
+   * @param columns
+   * @param callback
+   * @return mixed
+   */
+  async onceWithColumns (columns, callback) {
+    let original = this.columns
+
+    if (isNull(original)) {
+      this.columns = columns
+    }
+
+    let result = await callback()
+    this.columns = original
+    return result
+  }
+
+  /**
+   * Get an array with the values of a given column.
+   *
+   * @param column
+   * @param key
+   * @return any
+   */
+  async pluck (column, key = null) {
+    // First, we will need to select the results of the query accounting for the
+    // given columns / key. Once we have the results, we will be able to take
+    // the results and get the exact data that was requested for the query.
+    let queryResult = await this.onceWithColumns(
+      isNull(key) ? [column] : [column, key],
+      () => this.get()
+    )
+
+    if (!isNull(queryResult)) {
+      return queryResult
+    }
+
+    // If the columns are qualified with a table or have an alias, we cannot use
+    // those directly in the "pluck" operations since the results from the DB
+    // are only keyed by the column itself. We'll strip the table out here.
+    column = this.stripTableForPluck(column)
+    key = this.stripTableForPluck(key)
+
+    return this.pluckFromObjectColumn(queryResult, column, key)
+  }
+
+  /**
+   * Strip off the table name or alias from a column identifier.
+   *
+   * @param column
+   * @return string|null
+   */
+  stripTableForPluck (column) {
+    return isNull(column) ? column : last(column.split(/~\.| ~/));
+  }
+
+  /**
+   * Retrieve column values from rows represented as objects.
+   *
+   * @param queryResult
+   * @param column
+   * @param key
+   * @return any
+   */
+  pluckFromObjectColumn (queryResult, column, key) {
+    let results = []
+
+    if (isNull(key)) {
+      queryResult.forEach(row => {
+        results = [...results, row.column]
+      })
+    } else {
+      queryResult.forEach(row => {
+        results[row.key] = row.column
+      })
+    }
+
+    return results
+  }
 }

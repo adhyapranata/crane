@@ -1,5 +1,5 @@
 import Grammar from './Grammar'
-import { isUndefined } from './DataType'
+import { isNull, isUndefined } from './DataType'
 import { last, except, replaceFirst } from './Utilities'
 
 export default class SQLiteGrammar extends Grammar {
@@ -17,8 +17,8 @@ export default class SQLiteGrammar extends Grammar {
    * @param sql
    * @returns {string}
    */
-  static wrapUnion (sql) {
-    return `select * from ${sql})`
+  wrapUnion (sql) {
+    return `select * from (${sql})`
   }
 
   /**
@@ -102,10 +102,13 @@ export default class SQLiteGrammar extends Grammar {
    * @returns {string|*}
    */
   compileUpdate (query, values) {
-    if (Object.prototype.hasOwnProperty.call(query, 'joins') || Object.prototype.hasOwnProperty.call(query, 'limit')) {
-      return this.compileUpdateWithJoinsOrLimit(query, values)
+    if (
+      (Object.prototype.hasOwnProperty.call(query, 'joins') && query.joins.length) ||
+      (Object.prototype.hasOwnProperty.call(query, 'limit') && !isNull(query.limit))
+    ) {
+      return this.compileUpdateWithJoinsOrLimit(query, values).replace(/"/g, '')
     }
-    return super.compileUpdate(query, values)
+    return super.compileUpdate(query, values).replace(/"/g, '')
   }
 
   /**
@@ -124,11 +127,10 @@ export default class SQLiteGrammar extends Grammar {
    * @returns {*|SourceNode|string}
    */
   compileUpdateColumns (query, values) {
-    return values.map((value, key) => {
+    return Object.keys(values).map(key => {
       const column = last(key.split('.'))
-      return `${this.wrap(column)} = ${this.parameter(value)}`
-    }
-    ).join(', ')
+      return `${this.wrap(column)} = ${SQLiteGrammar.parameter(values[key])}`
+    }).join(', ')
   }
 
   /**
@@ -141,8 +143,7 @@ export default class SQLiteGrammar extends Grammar {
     const table = this.wrapTable(query.from)
     const columns = this.compileUpdateColumns(query, values)
     const alias = last(query.from.split(/\s+as\s+/i))
-    const selectSql = this.compileSelect(query.select(`${alias}.rowid`
-    ))
+    const selectSql = this.compileSelect(query.select(`${alias}.rowid`))
 
     return `update ${table} set ${columns} where ${this.wrap('rowid')} in (${selectSql})`
   }
@@ -153,9 +154,9 @@ export default class SQLiteGrammar extends Grammar {
    * @param values
    * @returns {*[]}
    */
-  static prepareBindingsForUpdate (bindings, values) {
+  prepareBindingsForUpdate (bindings, values) {
     const cleanBindings = except(bindings, ['select'])
-    return [...values, ...Object.values(cleanBindings).flat()]
+    return [...Object.values(values), ...Object.values(cleanBindings).flat()]
   }
 
   /**
@@ -190,8 +191,8 @@ export default class SQLiteGrammar extends Grammar {
    */
   compileTruncate (query) {
     return [
-      { 'delete from sqlite_sequence where name = ?': [query.from] },
-      { [`delete from ${this.wrapTable(query.from)}`]: [] }
+      {'delete from sqlite_sequence where name = ?': [query.from]},
+      {[`delete from ${this.wrapTable(query.from)}`]: []}
     ]
   }
 

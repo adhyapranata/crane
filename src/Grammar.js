@@ -1,6 +1,5 @@
 import Expression from './Expression'
-import JoinClause from './JoinClause'
-import { isString, isNull, isUndefined } from './DataType'
+import { isString, isNull, isUndefined, isObject } from './DataType'
 import { upperCaseFirstLetter } from './Utilities'
 
 export default class Grammar {
@@ -47,6 +46,8 @@ export default class Grammar {
 
     query.columns = original
 
+    sql = sql.replace(/"/g, '')
+
     return sql
   }
 
@@ -56,13 +57,13 @@ export default class Grammar {
    * @returns {[]}
    */
   compileComponents (query) {
-    const sql = []
+    let sql = []
 
     this.selectComponents.forEach(component => {
-      if (!isUndefined(query.component) && !isNull(query.component)) {
+      if (!isUndefined(query[component]) && !isNull(query[component])) {
         const method = `compile${upperCaseFirstLetter(component)}`
 
-        sql[component] = this[method](query, query.component)
+        sql = [...sql, this[method](query, query[component])]
       }
     })
 
@@ -84,7 +85,7 @@ export default class Grammar {
       column = `distinct ${column}`
     }
 
-    return `select ${aggregate.function}(${column}) as aggregate`
+    return `select ${aggregate.functionName}(${column}) as aggregate`
   }
 
   /**
@@ -161,7 +162,7 @@ export default class Grammar {
    */
   compileWheresToArray (query) {
     return query.wheres.map(where => {
-      return `${where.boolean} ${this[`where[${where.type}]`](query, where)}`
+      return `${where.boolean} ${this[`where${where.type}`](query, where)}`
     })
   }
 
@@ -172,7 +173,7 @@ export default class Grammar {
    * @returns {string}
    */
   concatenateWhereClauses (query, sql) {
-    const conjunction = query instanceof JoinClause ? 'on' : 'where'
+    const conjunction = query.hasOwnProperty('clause') && query.clause === 'join' ? 'on' : 'where'
 
     return `${conjunction} ${this.removeLeadingBoolean(sql.join(' '))}`
   }
@@ -371,7 +372,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereNested (query, where) {
-    const offset = query instanceof JoinClause ? 3 : 6
+    const offset = query.hasOwnProperty('clause') && query.clause === 'join' ? 3 : 6
 
     return `(${this.compileWheres(where.query).substring(offset)})`
   }
@@ -623,15 +624,15 @@ export default class Grammar {
       sql += this.compileUnion(union)
     })
 
-    if (!query.unionOrders.length) {
+    if (!isNull(query.unionOrders)) {
       sql += ` ${this.compileOrders(query, query.unionOrders)}`
     }
 
-    if (!isUndefined(query.unionLimit)) {
+    if (!isUndefined(query.unionLimit) && !isNull(query.unionLimit)) {
       sql += ` ${this.compileLimit(query, query.unionLimit)}`
     }
 
-    if (!isUndefined(query.unionOffset)) {
+    if (!isUndefined(query.unionOffset) && !isNull(query.unionOffset)) {
       sql += ` ${this.compileOffset(query, query.unionOffset)}`
     }
 
@@ -691,7 +692,7 @@ export default class Grammar {
   compileInsert (query, values) {
     const table = this.wrapTable(query.from)
 
-    if (!Array.isArray(values.length) && !Object.values(values).length) {
+    if (isNull(values)) {
       return `insert into ${table} default values`
     }
 
@@ -705,7 +706,9 @@ export default class Grammar {
       return `(${this.parameterize(record)})`
     }).join(', ')
 
-    return `insert into ${table} (${columns}) values ${parameters}`
+    let sql = `insert into ${table} (${columns}) values ${parameters}`
+
+    return sql.replace(/"/g, '')
   }
 
   /**
@@ -752,9 +755,9 @@ export default class Grammar {
 
     const where = this.compileWheres(query)
 
-    return (!isUndefined(query.joins)
-      ? this.compileUpdateWithJoins(query, table, columns, where)
-      : this.compileUpdateWithoutJoins(query, table, columns, where)
+    return (!isUndefined(query.joins) && !isNull(query.joins)
+        ? this.compileUpdateWithJoins(query, table, columns, where)
+        : this.compileUpdateWithoutJoins(query, table, columns, where)
     ).trim()
   }
 
@@ -765,8 +768,8 @@ export default class Grammar {
    * @returns {SourceNode | * | string}
    */
   compileUpdateColumns (query, values) {
-    return values.map((value, key) => {
-      return `${this.wrap(key)} = ${Grammar.parameter(value)}`
+    return Object.keys(values).map(key => {
+      return `${this.wrap(key)} = ${Grammar.parameter(values[key])}`
     }).join(', ')
   }
 
@@ -805,7 +808,7 @@ export default class Grammar {
   prepareBindingsForUpdate (bindings, values) {
     const { select, join, ...cleanBindings } = bindings
 
-    return [...bindings.join, ...values, ...Object.values(cleanBindings).flat()]
+    return [...bindings.join, ...Object.values(values), ...Object.values(cleanBindings).flat()]
   }
 
   /**
@@ -818,10 +821,12 @@ export default class Grammar {
 
     const where = this.compileWheres(query)
 
-    return (!isUndefined(query.joins)
-      ? this.compileDeleteWithJoins(query, table, where)
-      : this.compileDeleteWithoutJoins(query, table, where)
+    const sql = (!isNull(query.joins)
+        ? this.compileDeleteWithJoins(query, table, where)
+        : this.compileDeleteWithoutJoins(query, table, where)
     ).trim()
+
+    return sql.replace(/"/g, '')
   }
 
   /**
@@ -923,7 +928,7 @@ export default class Grammar {
    * @returns {SourceNode | * | string}
    */
   parameterize (values) {
-    return values.map(value => Grammar.parameter(value)).join(', ')
+    return Object.values(values).map(value => Grammar.parameter(value)).join(', ')
   }
 
   /**
@@ -946,7 +951,7 @@ export default class Grammar {
       return Grammar.getValue(value)
     }
 
-    if (value.indexOf(' as ') !== false) {
+    if (value.includes(' as ') !== false) {
       return this.wrapAliasedValue(value, prefixAlias)
     }
 
@@ -1004,7 +1009,7 @@ export default class Grammar {
    */
   wrapTable (table) {
     if (!Grammar.isExpression(table)) {
-      return this.wrap(this.tablePrefix.table, true)
+      return this.wrap(`${this.tablePrefix}${table}`, true)
     }
     return Grammar.getValue(table)
   }
@@ -1085,7 +1090,7 @@ export default class Grammar {
    * @returns {boolean}
    */
   static isJsonSelector (value) {
-    return value.contains('->')
+    return value.includes('->')
   }
 
   /**
@@ -1105,7 +1110,7 @@ export default class Grammar {
    * @returns {*|void|string}
    */
   removeLeadingBoolean (value) {
-    return value.replace('/and |or /i', '', 1)
+    return value.replace(/and |or /i, '')
   }
 
   /**

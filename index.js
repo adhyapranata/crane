@@ -1,5 +1,4 @@
 import Builder from './src/Builder'
-import DB from './src/Database'
 
-export const Database = DB
-export default new Builder()
+export DB from './src/Database'
+export default () => new Builder()
