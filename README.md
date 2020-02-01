@@ -1,11 +1,13 @@
-# Crane: A React Native Query Builder
+# Crane: React Native SQLite Query Builder
+
+[![Crane](./banner.png)](https://github.com/adhyapranata/crane)
+
+[![Code Climate](https://img.shields.io/codeclimate/maintainability/adhyapranata/crane.svg)](https://codeclimate.com/github/adhyapranata/crane)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 Crane is a query builder for React Native extracted from Laravel's [illuminate/database](https://github.com/illuminate/database).
 This library supports both [react-native-sqlite-storage](https://github.com/andpor/react-native-sqlite-storage) and [expo sqlite](https://docs.expo.io/versions/latest/sdk/sqlite/).
 For a quick start, please try [this sandbox](https://github.com/adhyapranata/crane-expo-sandbox).  
-
-[![Code Climate](https://img.shields.io/codeclimate/maintainability/adhyapranata/crane.svg)](https://codeclimate.com/github/adhyapranata/crane)
-[![License](http://img.shields.io/:license-mit-blue.svg?style=flat)](https://opensource.org/licenses/MIT)
 
 ## Table of Contents
 
@@ -19,22 +21,22 @@ For a quick start, please try [this sandbox](https://github.com/adhyapranata/cra
 
 ## Installation 
 
-Crane requires SQLite driver.
+Crane *requires* SQLite driver in order to work.
 
-If you are using expo, install the expo-sqlite
+If you are using expo, install the `expo-sqlite`
 ```bash
 expo install expo-sqlite
 ```
 
-If you are using bare react native, install the react-native-sqlite-storage. For detail instruction, please refer to the package [documentation](https://github.com/andpor/react-native-sqlite-storage)
+If you are using bare React Native, install the `react-native-sqlite-storage`. For detail instruction, please refer to the package [documentation](https://github.com/andpor/react-native-sqlite-storage)
 ```bash
 yarn add react-native-sqlite-storage
 ```
 
-And then, install crane
+Finally, install `crane`
 
 ```bash
-yarn add git+https://git@github.com:adhyapranata/crane.git#0.1.0
+yarn add git+https://git@github.com:adhyapranata/crane.git#0.2.3
 ```
 
 ## Getting Started
@@ -42,16 +44,16 @@ yarn add git+https://git@github.com:adhyapranata/crane.git#0.1.0
 ### For Expo
 ```javascript
 import React, { useEffect } from 'react';
-import { Text, View } from 'react-native';
-import Builder, { DB } from 'crane';
+import { StyleSheet, Text, View } from 'react-native';
+import { Asset } from 'expo-asset';
 import * as SQLite from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
-import { Asset } from 'expo-asset';
+import Builder, { DB } from 'crane'; // Import the library
 
 
 export default function App() {
   useEffect(() => {
-    makeSQLiteDirAsync();
+    testDB();
   }, []);
 
   return (
@@ -61,12 +63,21 @@ export default function App() {
   );
 }
 
-export async function makeSQLiteDirAsync() {
-  const dbTest = SQLite.openDatabase('dummy.db');
+export async function testDB() {
+  await initDB();
+  await getAlbums();
+}
+
+export async function initDB() {
+  await testDriver();
+  await loadDB();
+}
+
+export async function testDriver() {
+  const dummy = SQLite.openDatabase('dummy.db');
 
   try {
-    await dbTest.transaction(tx => tx.executeSql(''));
-    loadDB();
+    await dummy.transaction(tx => tx.executeSql(''));
   } catch (e) {
     if (this.state.debugEnabled)
       console.log('error while executing SQL in dummy DB');
@@ -76,30 +87,43 @@ export async function makeSQLiteDirAsync() {
 export async function loadDB() {
   let dbFile = await FileSystem.getInfoAsync(`${FileSystem.documentDirectory}SQLite/db.db`);
 
-  if (!dbFile.exists) {
-    await FileSystem.downloadAsync(
-      Asset.fromModule(require('./assets/db/db.db')).uri,
-      `${FileSystem.documentDirectory}SQLite/db.db`
-    );
-  }
+  if (!dbFile.exists)
+    makeDir();
 
+  // Add connection using DB.addConnection
   DB.addConnection({
     type: 'expo',
     driver: SQLite,
     name: 'db.db',
   });
-
-  getAlbums();
 }
 
+export async function makeDir() {
+  await FileSystem.downloadAsync(
+    Asset.fromModule(require('./assets/db/db.db')).uri,
+    `${FileSystem.documentDirectory}SQLite/db.db`
+  );
+}
+
+
 export async function getAlbums() {
+  // Build your query
   let albums = await Builder()
-      .table('albums')
-      .where('ArtistId', '>', 200)
-      .get();
+    .table('albums')
+    .where('ArtistId', '>', 200)
+    .get();
 
   console.log(albums);
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 ```
 
 ### For Bare React Native
@@ -123,7 +147,7 @@ export async function getAlbums() {
 ### Retrieving Results
 **Retrieving All Rows From A Table**
 
-You may use the `table` method begin a query. The table method returns a fluent query builder instance for the given table, allowing you to chain more constraints onto the query and then finally get the results using the get method:
+You may use the `table` method begin a query. The table method returns a fluent query builder instance for the given table, allowing you to chain more constraints onto the query and then finally get the results using the `get` method:
 ```javascript
 let albums = await Builder()
     .table('albums')
