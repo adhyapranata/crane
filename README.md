@@ -39,7 +39,7 @@ yarn add react-native-sqlite-storage
 Finally, install `crane`
 
 ```bash
-yarn add git+https://git@github.com:adhyapranata/crane.git#0.2.4
+yarn add crane-query-builder
 ```
 
 ## Getting Started
