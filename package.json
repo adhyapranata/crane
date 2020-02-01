@@ -1,6 +1,7 @@
 {
   "name": "crane",
-  "version": "0.2.2",
+  "description": "React Native SQLite query builder",
+  "version": "0.2.3",
   "main": "index.js",
   "repository": "git@github.com:adhyapranata/crane.git",
   "author": "Adhya Pranata <adhyapranata@gmail.com>",
@@ -8,6 +9,7 @@
   "keywords": [
     "sqlite",
     "react-native",
+    "expo",
     "query-builder"
   ],
   "scripts": {
