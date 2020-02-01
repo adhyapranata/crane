@@ -6,11 +6,11 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 Crane is a query builder for React Native extracted from Laravel's [illuminate/database](https://github.com/illuminate/database).
-This library supports both [react-native-sqlite-storage](https://github.com/andpor/react-native-sqlite-storage) and [expo sqlite](https://docs.expo.io/versions/latest/sdk/sqlite/).
-For a quick start, please try [this sandbox](https://github.com/adhyapranata/crane-expo-sandbox).  
+This library supports both [react-native-sqlite-storage](https://github.com/andpor/react-native-sqlite-storage) and [expo sqlite](https://docs.expo.io/versions/latest/sdk/sqlite/).  
 
 ## Table of Contents
 
+- [Demo](#demo)
 - [Installation](#installation)
 - [Getting Started](#getting-started)
 - [Documentation](#documentation)
@@ -18,6 +18,9 @@ For a quick start, please try [this sandbox](https://github.com/adhyapranata/cra
 - [Support + Feedback](#support--feedback)
 - [Thank You](#thank-you)
 - [License](#license)
+
+## Demo
+For a demo, [click here](https://github.com/adhyapranata/crane-expo-demo).
 
 ## Installation 
 
@@ -36,7 +39,7 @@ yarn add react-native-sqlite-storage
 Finally, install `crane`
 
 ```bash
-yarn add git+https://git@github.com:adhyapranata/crane.git#0.2.3
+yarn add git+https://git@github.com:adhyapranata/crane.git#0.2.4
 ```
 
 ## Getting Started
