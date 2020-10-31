@@ -14,4 +14,13 @@ export default class Expression {
   getValue () {
     return this.value
   }
+
+  /**
+   * Get the value of the expression.
+   *
+   * @return string
+   */
+  toString() {
+    return this.getValue().toString()
+  }
 }

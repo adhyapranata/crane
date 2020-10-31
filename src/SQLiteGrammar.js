@@ -165,7 +165,7 @@ export default class SQLiteGrammar extends Grammar {
    * @returns {string|*}
    */
   compileDelete (query) {
-    if (isUndefined(query.joins) || isUndefined(query.limit)) {
+    if ((query.joins && query.joins.length) || (query.limit)) {
       return this.compileDeleteWithJoinsOrLimit(query)
     }
     return super.compileDelete(query)
