@@ -22,6 +22,17 @@ export default class Grammar {
   }
 
   /**
+   * Wrap an array of values.
+   *
+   * @param  {Array}  values
+   * @return {Array}
+   */
+  wrapArray(values)
+  {
+    return values.map(this.wrap);
+  }
+
+  /**
    *
    * @param query
    * @returns {string|*|string}
@@ -122,7 +133,7 @@ export default class Grammar {
    *
    * @param query
    * @param joins
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   compileJoins (query, joins) {
     return joins.map(join => {
@@ -207,7 +218,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereIn (query, where) {
-    if (!where.values.length) {
+    if (where.values && where.values.length) {
       return `${this.wrap(where.column)} in (${this.parameterize(where.values)})`
     }
 
@@ -221,7 +232,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereNotIn (query, where) {
-    if (!where.values.length) {
+    if (where.values && where.values.length) {
       return `${this.wrap(where.column)} not in (${this.parameterize(where.values)})`
     }
 
@@ -235,7 +246,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereNotInRaw (query, where) {
-    if (!where.values.length) {
+    if (where.values && where.values.length) {
       return `${this.wrap(where.column)} not in (${where.values.join(', ')})`
     }
 
@@ -249,7 +260,7 @@ export default class Grammar {
    * @returns {string}
    */
   whereInRaw (query, where) {
-    if (!where.values.length) {
+    if (where.values && where.values.length) {
       return `${this.wrap(where.column)} in (${where.values.join(', ')})`
     }
 
@@ -564,7 +575,7 @@ export default class Grammar {
    * @returns {string}
    */
   compileOrders (query, orders) {
-    if (!orders.length) {
+    if (orders.length) {
       return `order by ${this.compileOrdersToArray(query, orders).join(', ')}`
     }
 
@@ -609,7 +620,7 @@ export default class Grammar {
    * @returns {string}
    */
   compileOffset (query, offset) {
-    return `limit ${parseInt(offset)}`
+    return `offset ${parseInt(offset)}`
   }
 
   /**
@@ -765,7 +776,7 @@ export default class Grammar {
    *
    * @param query
    * @param values
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   compileUpdateColumns (query, values) {
     return Object.keys(values).map(key => {
@@ -812,21 +823,16 @@ export default class Grammar {
   }
 
   /**
+   * Compile a delete statement into SQL.
    *
-   * @param query
-   * @returns {string}
+   * @param  {Builder}  query
+   * @return string
    */
-  compileDelete (query) {
-    const table = this.wrapTable(query.from)
+  compileDelete(query)
+  {
+    const wheres = query.wheres instanceof Array ? this.compileWheres(query) : '';
 
-    const where = this.compileWheres(query)
-
-    const sql = (!isNull(query.joins)
-        ? this.compileDeleteWithJoins(query, table, where)
-        : this.compileDeleteWithoutJoins(query, table, where)
-    ).trim()
-
-    return sql.replace(/"/g, '')
+    return `delete from ${this.wrapTable(query.from)} ${wheres}`.trim();
   }
 
   /**
@@ -916,7 +922,7 @@ export default class Grammar {
   /**
    *
    * @param columns
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   columnize (columns) {
     return columns.map(column => this.wrap(column)).join(', ')
@@ -925,7 +931,7 @@ export default class Grammar {
   /**
    *
    * @param values
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   parameterize (values) {
     return Object.values(values).map(value => Grammar.parameter(value)).join(', ')
@@ -938,6 +944,21 @@ export default class Grammar {
    */
   static parameter (value) {
     return Grammar.isExpression(value) ? Grammar.getValue(value) : '?'
+  }
+
+  /**
+   * Quote the given string literal.
+   *
+   * @param  {string|Array}  value
+   * @return string
+   */
+  quoteString(value)
+  {
+    if (value instanceof Array) {
+      return value.map(this.quoteString).join(', ');
+    }
+
+    return `'${value}'`;
   }
 
   /**
@@ -965,7 +986,7 @@ export default class Grammar {
   /**
    *
    * @param segments
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   wrapSegments (segments) {
     return segments.map((segment, key) => {
@@ -1096,7 +1117,7 @@ export default class Grammar {
   /**
    *
    * @param segments
-   * @returns {SourceNode | * | string}
+   * @returns {string|*}
    */
   concatenate (segments) {
     return segments.filter(value => {
@@ -1119,5 +1140,38 @@ export default class Grammar {
    */
   getOperators () {
     return this.operators
+  }
+
+  /**
+   * Get the format for database stored dates.
+   *
+   * @return {String}
+   */
+  getDateFormat()
+  {
+    return 'YYYY-MM-DD HH:mm:ss';
+  }
+
+  /**
+   * Get the grammar's table prefix.
+   *
+   * @return string
+   */
+  getTablePrefix()
+  {
+    return this.tablePrefix;
+  }
+
+  /**
+   * Set the grammar's table prefix.
+   *
+   * @param  {String}  prefix
+   * @return {Grammar}
+   */
+  setTablePrefix(prefix)
+  {
+    this.tablePrefix = prefix;
+
+    return this;
   }
 }
